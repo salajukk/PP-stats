@@ -612,19 +612,20 @@ function sortAndRender(data, sKey, sDesc, tbodyId, clickFn, activeLabel, thPrefi
 
   const total=makeTotalRow(data, statCols);
   const totalHtml=`<tr class="total-row">
-    <td>TOTAL</td><td>${total.gp}</td>
+    <td>TOTAL</td>
+    ${statCols===STAT_COLS_P ? `<td>${total.gp}</td>` : ''}
     ${statCols.map(k=>`<td>${total[k]!==undefined?total[k]:'-'}</td>`).join('')}
   </tr>`;
 
   document.getElementById(tbodyId).innerHTML = totalHtml + data.map(r=>`
     <tr onclick="${clickFn}('${r.label.replace(/'/g,"\\'")}',this)" style="cursor:pointer;${activeLabel===r.label?'background:rgba(240,165,0,.12);outline:1px solid var(--accent);':''}">
       <td style="white-space:nowrap">${r.displayLabel||r.label}</td>
-      <td>${r.gp}</td>
+      ${statCols===STAT_COLS_P ? `<td>${r.gp}</td>` : ''}
       ${statCols.map(k=>`<td class="${r[k]!=='-'&&+(r[k]||0)===mx[k]&&mx[k]>0?'hl':''}">${r[k]}</td>`).join('')}
     </tr>`).join('');
 
   document.querySelectorAll(`#${thPrefix} th`).forEach(t=>t.classList.remove('sa','sd'));
-  const keys=['label','gp',...statCols];
+  const keys=statCols===STAT_COLS_P ? ['label','gp',...statCols] : ['label',...statCols];
   const idx=keys.indexOf(sKey);
   const ths=document.querySelectorAll(`#${thPrefix} th`);
   if(idx>=0&&ths[idx]) ths[idx].classList.add(sDesc?'sd':'sa');
