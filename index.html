@@ -120,15 +120,68 @@
     <div class="sg" id="sg"></div>
   </section>
   <section id="tbl" class="section">
-    <h2>Tilastotaulukko</h2><p class="sdesc">Klikkaa saraketta järjestääksesi.</p>
-    <div class="twrap"><table><thead><tr>
-      <th onclick="srt('Nimi')">Pelaaja</th><th onclick="srt('Pelit')">GP</th>
-      <th onclick="srt('PPG')">PPG</th><th onclick="srt('RPG')">RPG</th>
-      <th onclick="srt('APG')">APG</th><th onclick="srt('SPG')">SPG</th>
-      <th onclick="srt('BPG')">BPG</th><th onclick="srt('TOPG')">TO</th>
-      <th onclick="srt('FGp')">FG%</th><th onclick="srt('P3p')">3PT%</th>
-      <th onclick="srt('AT')">AST/TO</th><th onclick="srt('EFF')">EFF</th>
-    </tr></thead><tbody id="tb"></tbody></table></div>
+    <h2>Tilastotaulukko</h2>
+    <div style="display:flex;align-items:center;gap:10px;margin-bottom:20px;flex-wrap:wrap">
+      <p class="sdesc" style="margin-bottom:0">Klikkaa riviä suodattaaksesi toisen taulukon.</p>
+      <div style="display:flex;background:var(--surface2);border:1px solid var(--border);border-radius:8px;overflow:hidden;margin-left:auto;flex-shrink:0">
+        <button id="btnYht" onclick="setTblMode('yht')" style="padding:7px 16px;border:none;background:var(--accent);color:#0d0f14;font-family:'DM Sans',sans-serif;font-size:.8rem;font-weight:600;cursor:pointer">Yhteensä</button>
+        <button id="btnPPeli" onclick="setTblMode('ppeli')" style="padding:7px 16px;border:none;background:transparent;color:var(--muted);font-family:'DM Sans',sans-serif;font-size:.8rem;font-weight:500;cursor:pointer">Per peli</button>
+      </div>
+    </div>
+
+    <h3 style="font-size:.8rem;text-transform:uppercase;letter-spacing:1px;color:var(--muted);margin-bottom:8px" id="p1label">Pelaajat <span id="filterBadge" style="display:none;background:var(--accent);color:#0d0f14;border-radius:4px;padding:2px 8px;font-size:.7rem;margin-left:8px;cursor:pointer" onclick="clearFilter()">✕ Tyhjennä suodatin</span></h3>
+    <div class="twrap" style="margin-bottom:32px">
+      <table id="playerTable"><thead><tr>
+        <th onclick="srtP('label')">Pelaaja</th>
+        <th onclick="srtP('gp')">GP</th>
+        <th onclick="srtP('pts')">PTS</th>
+        <th onclick="srtP('min')">MIN</th>
+        <th onclick="srtP('fgm')">FGM</th>
+        <th onclick="srtP('fga')">FGA</th>
+        <th onclick="srtP('fgpct')">FG%</th>
+        <th onclick="srtP('t3m')">3PTM</th>
+        <th onclick="srtP('t3a')">3PTA</th>
+        <th onclick="srtP('t3pct')">3PT%</th>
+        <th onclick="srtP('ftm')">FTM</th>
+        <th onclick="srtP('fta')">FTA</th>
+        <th onclick="srtP('ftpct')">FT%</th>
+        <th onclick="srtP('orb')">ORB</th>
+        <th onclick="srtP('drb')">DRB</th>
+        <th onclick="srtP('rb')">RB</th>
+        <th onclick="srtP('ast')">AST</th>
+        <th onclick="srtP('stl')">STL</th>
+        <th onclick="srtP('blk')">BLK</th>
+        <th onclick="srtP('to')">TO</th>
+        <th onclick="srtP('pf')">PF</th>
+      </tr></thead><tbody id="tbP"></tbody></table>
+    </div>
+
+    <h3 style="font-size:.8rem;text-transform:uppercase;letter-spacing:1px;color:var(--muted);margin-bottom:8px" id="p2label">Vastustajat</h3>
+    <div class="twrap">
+      <table id="oppTable"><thead><tr>
+        <th onclick="srtO('label')">Vastustaja</th>
+        <th onclick="srtO('gp')">GP</th>
+        <th onclick="srtO('pts')">PTS</th>
+        <th onclick="srtO('min')">MIN</th>
+        <th onclick="srtO('fgm')">FGM</th>
+        <th onclick="srtO('fga')">FGA</th>
+        <th onclick="srtO('fgpct')">FG%</th>
+        <th onclick="srtO('t3m')">3PTM</th>
+        <th onclick="srtO('t3a')">3PTA</th>
+        <th onclick="srtO('t3pct')">3PT%</th>
+        <th onclick="srtO('ftm')">FTM</th>
+        <th onclick="srtO('fta')">FTA</th>
+        <th onclick="srtO('ftpct')">FT%</th>
+        <th onclick="srtO('orb')">ORB</th>
+        <th onclick="srtO('drb')">DRB</th>
+        <th onclick="srtO('rb')">RB</th>
+        <th onclick="srtO('ast')">AST</th>
+        <th onclick="srtO('stl')">STL</th>
+        <th onclick="srtO('blk')">BLK</th>
+        <th onclick="srtO('to')">TO</th>
+        <th onclick="srtO('pf')">PF</th>
+      </tr></thead><tbody id="tbO"></tbody></table>
+    </div>
   </section>
 </div>
 
@@ -252,8 +305,9 @@ function changeSeason(){
   curSeason = document.getElementById('seasonSel').value;
   processSeason(curSeason);
   r1=players[0]; r2=players[1]; tlSel=new Set(players.slice(0,3));
+  activePlayer=null; activeOpp=null;
   updateRecord(); buildRadarChips(); buildRadar();
-  buildTlChips(); buildTimeline(); buildTeamChart(); buildSG(); renderTable();
+  buildTlChips(); buildTimeline(); buildTeamChart(); buildSG(); renderBothTables();
 }
 
 function updateRecord(){
@@ -420,27 +474,145 @@ function buildSG(){
   });
 }
 
-function renderTable(){
-  const keys=['PPG','RPG','APG','SPG','BPG','FGp','P3p','AT','EFF'];
-  const mx={};
-  keys.forEach(k=>mx[k]=Math.max(...players.map(p=>pStats[p]?.[k]||0)));
-  const data=players.map(p=>({Nimi:p,...pStats[p]}));
-  data.sort((a,b)=>{ const av=a[sKey]??0,bv=b[sKey]??0; if(sKey==='Nimi') return sDesc?b.Nimi.localeCompare(a.Nimi):a.Nimi.localeCompare(b.Nimi); return sDesc?bv-av:av-bv; });
-  document.getElementById('tb').innerHTML=data.map(r=>`<tr>
-    <td>${r.Nimi}</td><td>${r.Pelit}</td>
-    <td class="${r.PPG===mx.PPG?'hl':''}">${r.PPG}</td><td class="${r.RPG===mx.RPG?'hl':''}">${r.RPG}</td>
-    <td class="${r.APG===mx.APG?'hl':''}">${r.APG}</td><td class="${r.SPG===mx.SPG?'hl':''}">${r.SPG}</td>
-    <td class="${r.BPG===mx.BPG?'hl':''}">${r.BPG}</td><td>${r.TOPG}</td>
-    <td class="${r.FGp===mx.FGp?'hl':''}">${r.FGp}%</td><td class="${r.P3p===mx.P3p?'hl':''}">${r.P3p}%</td>
-    <td class="${r.AT===mx.AT?'hl':''}">${r.AT}</td><td class="${r.EFF===mx.EFF?'hl':''}">${r.EFF}</td>
-  </tr>`).join('');
-  document.querySelectorAll('th').forEach(t=>t.classList.remove('sa','sd'));
-  const ks=['Nimi','Pelit','PPG','RPG','APG','SPG','BPG','TOPG','FGp','P3p','AT','EFF'];
-  const idx=ks.indexOf(sKey);
-  if(idx>=0) document.querySelectorAll('th')[idx].classList.add(sDesc?'sd':'sa');
+// ── TILASTOTAULUKKO ───────────────────────────────────────
+let tblMode='yht';       // 'yht' | 'ppeli'
+let activePlayer=null;   // valittu pelaaja
+let activeOpp=null;      // valittu vastustaja
+let sKeyP='pts', sDescP=true;
+let sKeyO='label', sDescO=false;
+
+function setTblMode(m){
+  tblMode=m;
+  const yht=m==='yht';
+  document.getElementById('btnYht').style.cssText=`padding:7px 16px;border:none;background:${yht?'var(--accent)':'transparent'};color:${yht?'#0d0f14':'var(--muted)'};font-family:'DM Sans',sans-serif;font-size:.8rem;font-weight:${yht?'600':'500'};cursor:pointer`;
+  document.getElementById('btnPPeli').style.cssText=`padding:7px 16px;border:none;background:${!yht?'var(--accent)':'transparent'};color:${!yht?'#0d0f14':'var(--muted)'};font-family:'DM Sans',sans-serif;font-size:.8rem;font-weight:${!yht?'600':'500'};cursor:pointer`;
+  renderBothTables();
 }
 
-function srt(k){ if(sKey===k) sDesc=!sDesc; else{sKey=k;sDesc=true;} renderTable(); }
+// Aggregoi rivit ryhmittäin
+// Muuntaa hh:mm:ss tai desimaaliajan minuuteiksi
+function parseMinutes(v){
+  if(v==null||v==='') return 0;
+  if(typeof v==='number'){
+    // Google Sheets datetime desimaali: 1.0 = 24h, joten kerrotaan 24*60
+    return +(v*24*60).toFixed(1);
+  }
+  if(typeof v==='string'){
+    const parts=v.split(':');
+    if(parts.length===3) return +(+parts[0]*60 + +parts[1] + +parts[2]/60).toFixed(1);
+    if(parts.length===2) return +(+parts[0]*60 + +parts[1]).toFixed(1);
+  }
+  return 0;
+}
+
+function aggregateRows(rows, groupKey){
+  const map={};
+  rows.forEach(r=>{
+    const k=r[groupKey]; if(!k) return;
+    if(!map[k]) map[k]={label:k,gp:new Set(),pts:0,min:0,fgm:0,fga:0,t3m:0,t3a:0,ftm:0,fta:0,orb:0,drb:0,rb:0,ast:0,stl:0,blk:0,to:0,pf:0};
+    const m=map[k];
+    m.gp.add(r[COL.ottelu]);
+    m.pts+=n(r[COL.pisteet]);
+    m.min+=parseMinutes(r['Pl. Time']);
+    m.fgm+=n(r[COL.fgm]); m.fga+=n(r[COL.fga]);
+    m.t3m+=n(r[COL.t3m]); m.t3a+=n(r[COL.t3a]);
+    m.ftm+=n(r[COL.ftm]); m.fta+=n(r[COL.fta]);
+    m.orb+=n(r[COL.orb]); m.drb+=n(r[COL.drb]); m.rb+=n(r[COL.rb]);
+    m.ast+=n(r[COL.ast]); m.stl+=n(r[COL.stl]); m.blk+=n(r[COL.blk]);
+    m.to+=n(r[COL.to]);   m.pf+=n(r[COL.pf]);
+  });
+  return Object.values(map).map(m=>{
+    const g=m.gp.size;
+    const div=tblMode==='ppeli'?g:1;
+    const pct=(a,b)=>b>0?+(a/b*100).toFixed(1):'-';
+    const v=x=>tblMode==='ppeli'?+(x/div).toFixed(1):+x.toFixed(1);
+    return{
+      label:m.label, gp:g,
+      pts:v(m.pts), min:m.min>0?v(m.min):'-',
+      fgm:v(m.fgm), fga:v(m.fga), fgpct:pct(m.fgm,m.fga),
+      t3m:v(m.t3m), t3a:v(m.t3a), t3pct:pct(m.t3m,m.t3a),
+      ftm:v(m.ftm), fta:v(m.fta), ftpct:pct(m.ftm,m.fta),
+      orb:v(m.orb), drb:v(m.drb), rb:v(m.rb),
+      ast:v(m.ast), stl:v(m.stl), blk:v(m.blk), to:v(m.to), pf:v(m.pf),
+    };
+  });
+}
+
+const STAT_COLS=['pts','min','fgm','fga','fgpct','t3m','t3a','t3pct','ftm','fta','ftpct','orb','drb','rb','ast','stl','blk','to','pf'];
+
+function sortAndRender(data, sKey, sDesc, tbodyId, clickFn, activeLabel, thPrefix){
+  data.sort((a,b)=>{
+    if(sKey==='label') return sDesc?b.label.localeCompare(a.label):a.label.localeCompare(b.label);
+    const av=a[sKey]==='-'?-1:+(a[sKey]??0);
+    const bv=b[sKey]==='-'?-1:+(b[sKey]??0);
+    return sDesc?bv-av:av-bv;
+  });
+  // Maxes for highlighting
+  const mx={};
+  STAT_COLS.forEach(k=>{ const vals=data.map(r=>r[k]==='-'?0:+(r[k]||0)); mx[k]=Math.max(...vals); });
+
+  document.getElementById(tbodyId).innerHTML=data.map(r=>`
+    <tr onclick="${clickFn}('${r.label.replace(/'/g,"\\'")}',this)" style="cursor:pointer;${activeLabel===r.label?'background:rgba(240,165,0,.12);outline:1px solid var(--accent);':''}">
+      <td style="white-space:nowrap">${r.label}</td>
+      <td>${r.gp}</td>
+      ${STAT_COLS.map(k=>`<td class="${r[k]!=='-'&&+(r[k]||0)===mx[k]&&mx[k]>0?'hl':''}">${r[k]}</td>`).join('')}
+    </tr>`).join('');
+
+  // Sort indicators
+  document.querySelectorAll(`#${thPrefix} th`).forEach(t=>t.classList.remove('sa','sd'));
+  const keys=['label','gp',...STAT_COLS];
+  const idx=keys.indexOf(sKey);
+  const ths=document.querySelectorAll(`#${thPrefix} th`);
+  if(idx>=0&&ths[idx]) ths[idx].classList.add(sDesc?'sd':'sa');
+}
+
+function getFilteredRows(){
+  let rows=allRows.filter(r=>r[COL.kausi]===curSeason&&r[COL.sarja]==='Sarja');
+  if(activeOpp)    rows=rows.filter(r=>r[COL.vastustaja]===activeOpp);
+  if(activePlayer) rows=rows.filter(r=>r[COL.nimi]===activePlayer);
+  return rows;
+}
+
+function renderBothTables(){
+  const baseRows=allRows.filter(r=>r[COL.kausi]===curSeason&&r[COL.sarja]==='Sarja');
+
+  // Pelaajataulukko: suodatetaan vastustajan mukaan jos valittu
+  const pRows=activeOpp?baseRows.filter(r=>r[COL.vastustaja]===activeOpp):baseRows;
+  const pData=aggregateRows(pRows, COL.nimi);
+  sortAndRender(pData,sKeyP,sDescP,'tbP','clickPlayer',activePlayer,'playerTable');
+
+  // Vastustajtaulukko: suodatetaan pelaajan mukaan jos valittu
+  // Vastustajarivit: yksi rivi per ottelu per vastustaja, joten aggregoi ottelunumeron kautta
+  const oRows=activePlayer?baseRows.filter(r=>r[COL.nimi]===activePlayer):baseRows;
+  // Deduploi pelaajittain: vastustajariveillä ei pidä laskea samaa ottelua moneen kertaan
+  // -> kerää per ottelu per vastustaja vain pelaajan rivit
+  const oData=aggregateRows(oRows, COL.vastustaja);
+  sortAndRender(oData,sKeyO,sDescO,'tbO','clickOpp',activeOpp,'oppTable');
+
+  // Päivitä otsikot
+  document.getElementById('p1label').innerHTML=`Pelaajat ${activeOpp?`<small style="color:var(--accent)">— ${activeOpp}</small>`:''}
+    <span id="filterBadge" style="display:${activePlayer||activeOpp?'inline':'none'};background:var(--accent);color:#0d0f14;border-radius:4px;padding:2px 8px;font-size:.7rem;margin-left:8px;cursor:pointer" onclick="clearFilter()">✕ Tyhjennä suodatin</span>`;
+  document.getElementById('p2label').innerHTML=`Vastustajat ${activePlayer?`<small style="color:var(--accent)">— ${activePlayer}</small>`:''}`;
+}
+
+function clickPlayer(name, tr){
+  activePlayer = activePlayer===name ? null : name;
+  activeOpp=null;
+  renderBothTables();
+}
+
+function clickOpp(name, tr){
+  activeOpp = activeOpp===name ? null : name;
+  activePlayer=null;
+  renderBothTables();
+}
+
+function clearFilter(){ activePlayer=null; activeOpp=null; renderBothTables(); }
+
+function srtP(k){ if(sKeyP===k) sDescP=!sDescP; else{sKeyP=k;sDescP=true;} renderBothTables(); }
+function srtO(k){ if(sKeyO===k) sDescO=!sDescO; else{sKeyO=k;sDescO=false;} renderBothTables(); }
+
+function renderTable(){ renderBothTables(); }
 
 function showTab(id,btn){
   document.querySelectorAll('.section').forEach(s=>s.classList.remove('active'));
