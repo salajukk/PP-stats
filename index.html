@@ -492,9 +492,9 @@ function setTblMode(m){
 // Aggregoi rivit ryhmittäin
 // Muuntaa hh:mm:ss tai desimaaliajan minuuteiksi
 function parseMinutes(v){
-  if(v==null||v==='') return 0;
+  if(v==null||v==='') return null;
   if(typeof v==='number'){
-    // Google Sheets datetime desimaali: 1.0 = 24h, joten kerrotaan 24*60
+    if(v===0) return null;
     return +(v*24*60).toFixed(1);
   }
   if(typeof v==='string'){
@@ -502,33 +502,43 @@ function parseMinutes(v){
     if(parts.length===3) return +(+parts[0]*60 + +parts[1] + +parts[2]/60).toFixed(1);
     if(parts.length===2) return +(+parts[0]*60 + +parts[1]).toFixed(1);
   }
-  return 0;
+  return null;
 }
 
 function aggregateRows(rows, groupKey){
   const map={};
+  // Kerätään myös ottelunumero vastustajille
+  const oppGameNum={};
   rows.forEach(r=>{
     const k=r[groupKey]; if(!k) return;
-    if(!map[k]) map[k]={label:k,gp:new Set(),pts:0,min:0,fgm:0,fga:0,t3m:0,t3a:0,ftm:0,fta:0,orb:0,drb:0,rb:0,ast:0,stl:0,blk:0,to:0,pf:0};
+    if(!map[k]) map[k]={label:k,gp:new Set(),pts:0,min:0,minHasData:false,fgm:0,fga:0,t3m:0,t3a:0,ftm:0,fta:0,orb:0,drb:0,rb:0,ast:0,stl:0,blk:0,to:0,pf:0};
     const m=map[k];
     m.gp.add(r[COL.ottelu]);
     m.pts+=n(r[COL.pisteet]);
-    m.min+=parseMinutes(r['Pl. Time']);
+    const mins=parseMinutes(r['Pl. Time']);
+    if(mins!==null){ m.min+=mins; m.minHasData=true; }
     m.fgm+=n(r[COL.fgm]); m.fga+=n(r[COL.fga]);
     m.t3m+=n(r[COL.t3m]); m.t3a+=n(r[COL.t3a]);
     m.ftm+=n(r[COL.ftm]); m.fta+=n(r[COL.fta]);
     m.orb+=n(r[COL.orb]); m.drb+=n(r[COL.drb]); m.rb+=n(r[COL.rb]);
     m.ast+=n(r[COL.ast]); m.stl+=n(r[COL.stl]); m.blk+=n(r[COL.blk]);
     m.to+=n(r[COL.to]);   m.pf+=n(r[COL.pf]);
+    // tallenna ottelunumero vastustajataulua varten
+    if(groupKey===COL.vastustaja) oppGameNum[k]=r[COL.ottelu];
   });
   return Object.values(map).map(m=>{
     const g=m.gp.size;
     const div=tblMode==='ppeli'?g:1;
     const pct=(a,b)=>b>0?+(a/b*100).toFixed(1):'-';
-    const v=x=>tblMode==='ppeli'?+(x/div).toFixed(1):+x.toFixed(1);
+    const v=x=>+(tblMode==='ppeli'?(x/div):(x)).toFixed(1);
+    const gameNum=oppGameNum[m.label]||999;
     return{
-      label:m.label, gp:g,
-      pts:v(m.pts), min:m.min>0?v(m.min):'-',
+      label:m.label,
+      displayLabel: oppGameNum[m.label]!==undefined ? `O${oppGameNum[m.label]} ${m.label}` : m.label,
+      gameNum,
+      gp:g,
+      pts:v(m.pts),
+      min:m.minHasData ? v(m.min) : '-',
       fgm:v(m.fgm), fga:v(m.fga), fgpct:pct(m.fgm,m.fga),
       t3m:v(m.t3m), t3a:v(m.t3a), t3pct:pct(m.t3m,m.t3a),
       ftm:v(m.ftm), fta:v(m.fta), ftpct:pct(m.ftm,m.fta),
@@ -542,23 +552,22 @@ const STAT_COLS=['pts','min','fgm','fga','fgpct','t3m','t3a','t3pct','ftm','fta'
 
 function sortAndRender(data, sKey, sDesc, tbodyId, clickFn, activeLabel, thPrefix){
   data.sort((a,b)=>{
-    if(sKey==='label') return sDesc?b.label.localeCompare(a.label):a.label.localeCompare(b.label);
+    if(sKey==='label') return sDesc ? b.gameNum-a.gameNum : a.gameNum-b.gameNum;
+    if(sKey==='gp') return sDesc?b.gp-a.gp:a.gp-b.gp;
     const av=a[sKey]==='-'?-1:+(a[sKey]??0);
     const bv=b[sKey]==='-'?-1:+(b[sKey]??0);
     return sDesc?bv-av:av-bv;
   });
-  // Maxes for highlighting
   const mx={};
   STAT_COLS.forEach(k=>{ const vals=data.map(r=>r[k]==='-'?0:+(r[k]||0)); mx[k]=Math.max(...vals); });
 
   document.getElementById(tbodyId).innerHTML=data.map(r=>`
     <tr onclick="${clickFn}('${r.label.replace(/'/g,"\\'")}',this)" style="cursor:pointer;${activeLabel===r.label?'background:rgba(240,165,0,.12);outline:1px solid var(--accent);':''}">
-      <td style="white-space:nowrap">${r.label}</td>
+      <td style="white-space:nowrap">${r.displayLabel||r.label}</td>
       <td>${r.gp}</td>
       ${STAT_COLS.map(k=>`<td class="${r[k]!=='-'&&+(r[k]||0)===mx[k]&&mx[k]>0?'hl':''}">${r[k]}</td>`).join('')}
     </tr>`).join('');
 
-  // Sort indicators
   document.querySelectorAll(`#${thPrefix} th`).forEach(t=>t.classList.remove('sa','sd'));
   const keys=['label','gp',...STAT_COLS];
   const idx=keys.indexOf(sKey);
