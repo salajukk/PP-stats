@@ -52,13 +52,16 @@
   .biglbl{font-size:.7rem;color:var(--muted);text-transform:uppercase}
   .twrap{overflow-x:auto}
   table{width:100%;border-collapse:collapse;font-size:.85rem}
-  th{background:var(--surface2);color:var(--muted);font-weight:500;text-transform:uppercase;font-size:.7rem;letter-spacing:1px;padding:10px 12px;text-align:right;cursor:pointer;user-select:none;white-space:nowrap}
-  th:first-child{text-align:left}
+  th{background:var(--surface2);color:var(--muted);font-weight:500;text-transform:uppercase;font-size:.7rem;letter-spacing:1px;padding:10px 12px;text-align:right;cursor:pointer;user-select:none;white-space:nowrap;position:sticky;top:0;z-index:2}
+  th:first-child{text-align:left;position:sticky;left:0;top:0;z-index:3;background:var(--surface2)}
   th:hover{color:var(--accent)}
   th.sa::after{content:' ▲'}th.sd::after{content:' ▼'}
   td{padding:10px 12px;text-align:right;border-bottom:1px solid var(--border)}
-  td:first-child{text-align:left;font-weight:500}
+  td:first-child{text-align:left;font-weight:500;position:sticky;left:0;z-index:1;background:var(--bg)}
   tr:hover td{background:var(--surface)}
+  tr:hover td:first-child{background:var(--surface)}
+  tr.total-row td{background:var(--surface2);font-weight:600;color:var(--text);border-top:2px solid var(--border);border-bottom:2px solid var(--border)}
+  tr.total-row td:first-child{color:var(--accent);background:var(--surface2)}
   .hl{color:var(--accent);font-weight:600}
   .upd{font-size:.75rem;color:var(--muted);margin-top:12px;text-align:right}
   @media(max-width:600px){
@@ -132,54 +135,55 @@
     <h3 style="font-size:.8rem;text-transform:uppercase;letter-spacing:1px;color:var(--muted);margin-bottom:8px" id="p1label">Pelaajat <span id="filterBadge" style="display:none;background:var(--accent);color:#0d0f14;border-radius:4px;padding:2px 8px;font-size:.7rem;margin-left:8px;cursor:pointer" onclick="clearFilter()">✕ Tyhjennä suodatin</span></h3>
     <div class="twrap" style="margin-bottom:32px">
       <table id="playerTable"><thead><tr>
-        <th onclick="srtP('label')">Pelaaja</th>
-        <th onclick="srtP('gp')">GP</th>
-        <th onclick="srtP('pts')">PTS</th>
-        <th onclick="srtP('min')">MIN</th>
-        <th onclick="srtP('fgm')">FGM</th>
-        <th onclick="srtP('fga')">FGA</th>
-        <th onclick="srtP('fgpct')">FG%</th>
-        <th onclick="srtP('t3m')">3PTM</th>
-        <th onclick="srtP('t3a')">3PTA</th>
-        <th onclick="srtP('t3pct')">3PT%</th>
-        <th onclick="srtP('ftm')">FTM</th>
-        <th onclick="srtP('fta')">FTA</th>
-        <th onclick="srtP('ftpct')">FT%</th>
-        <th onclick="srtP('orb')">ORB</th>
-        <th onclick="srtP('drb')">DRB</th>
-        <th onclick="srtP('rb')">RB</th>
-        <th onclick="srtP('ast')">AST</th>
-        <th onclick="srtP('stl')">STL</th>
-        <th onclick="srtP('blk')">BLK</th>
-        <th onclick="srtP('to')">TO</th>
-        <th onclick="srtP('pf')">PF</th>
+        <th onclick="srtP('label')">Player</th>
+        <th onclick="srtP('gp')" title="Games Played">GP</th>
+        <th onclick="srtP('pts')" title="Points">PTS</th>
+        <th onclick="srtP('min')" title="Minutes">MIN</th>
+        <th onclick="srtP('fgm')" title="Field Goals Made">FGM</th>
+        <th onclick="srtP('fga')" title="Field Goals Attempted">FGA</th>
+        <th onclick="srtP('fgpct')" title="Field Goal Percentage">FG%</th>
+        <th onclick="srtP('t3m')" title="3-Pointers Made">3PM</th>
+        <th onclick="srtP('t3a')" title="3-Pointers Attempted">3PA</th>
+        <th onclick="srtP('t3pct')" title="3-Point Percentage">3P%</th>
+        <th onclick="srtP('ftm')" title="Free Throws Made">FTM</th>
+        <th onclick="srtP('fta')" title="Free Throws Attempted">FTA</th>
+        <th onclick="srtP('ftpct')" title="Free Throw Percentage">FT%</th>
+        <th onclick="srtP('orb')" title="Offensive Rebounds">ORB</th>
+        <th onclick="srtP('drb')" title="Defensive Rebounds">DRB</th>
+        <th onclick="srtP('rb')" title="Total Rebounds">REB</th>
+        <th onclick="srtP('ast')" title="Assists">AST</th>
+        <th onclick="srtP('stl')" title="Steals">STL</th>
+        <th onclick="srtP('blk')" title="Blocks">BLK</th>
+        <th onclick="srtP('to')" title="Turnovers">TOV</th>
+        <th onclick="srtP('pf')" title="Personal Fouls">PF</th>
       </tr></thead><tbody id="tbP"></tbody></table>
     </div>
 
     <h3 style="font-size:.8rem;text-transform:uppercase;letter-spacing:1px;color:var(--muted);margin-bottom:8px" id="p2label">Vastustajat</h3>
     <div class="twrap">
       <table id="oppTable"><thead><tr>
-        <th onclick="srtO('label')">Vastustaja</th>
-        <th onclick="srtO('gp')">GP</th>
-        <th onclick="srtO('pts')">PTS</th>
-        <th onclick="srtO('min')">MIN</th>
-        <th onclick="srtO('fgm')">FGM</th>
-        <th onclick="srtO('fga')">FGA</th>
-        <th onclick="srtO('fgpct')">FG%</th>
-        <th onclick="srtO('t3m')">3PTM</th>
-        <th onclick="srtO('t3a')">3PTA</th>
-        <th onclick="srtO('t3pct')">3PT%</th>
-        <th onclick="srtO('ftm')">FTM</th>
-        <th onclick="srtO('fta')">FTA</th>
-        <th onclick="srtO('ftpct')">FT%</th>
-        <th onclick="srtO('orb')">ORB</th>
-        <th onclick="srtO('drb')">DRB</th>
-        <th onclick="srtO('rb')">RB</th>
-        <th onclick="srtO('ast')">AST</th>
-        <th onclick="srtO('stl')">STL</th>
-        <th onclick="srtO('blk')">BLK</th>
-        <th onclick="srtO('to')">TO</th>
-        <th onclick="srtO('pf')">PF</th>
+        <th onclick="srtO('label')" title="Opponent">Vastustaja</th>
+        <th onclick="srtO('oppPts')" title="Opponent Score">OPP</th>
+        <th onclick="srtO('plr')" title="Players in game">PLR</th>
+        <th onclick="srtO('pts')" title="Points">PTS</th>
+        <th onclick="srtO('min')" title="Minutes">MIN</th>
+        <th onclick="srtO('fgm')" title="Field Goals Made">FGM</th>
+        <th onclick="srtO('fga')" title="Field Goals Attempted">FGA</th>
+        <th onclick="srtO('fgpct')" title="Field Goal Percentage">FG%</th>
+        <th onclick="srtO('t3m')" title="3-Pointers Made">3PM</th>
+        <th onclick="srtO('t3a')" title="3-Pointers Attempted">3PA</th>
+        <th onclick="srtO('t3pct')" title="3-Point Percentage">3P%</th>
+        <th onclick="srtO('ftm')" title="Free Throws Made">FTM</th>
+        <th onclick="srtO('fta')" title="Free Throws Attempted">FTA</th>
+        <th onclick="srtO('ftpct')" title="Free Throw Percentage">FT%</th>
+        <th onclick="srtO('orb')" title="Offensive Rebounds">ORB</th>
+        <th onclick="srtO('drb')" title="Defensive Rebounds">DRB</th>
+        <th onclick="srtO('rb')" title="Total Rebounds">REB</th>
+        <th onclick="srtO('ast')" title="Assists">AST</th>
+        <th onclick="srtO('stl')" title="Steals">STL</th>
+        <th onclick="srtO('blk')" title="Blocks">BLK</th>
+        <th onclick="srtO('to')" title="Turnovers">TOV</th>
+        <th onclick="srtO('pf')" title="Personal Fouls">PF</th>
       </tr></thead><tbody id="tbO"></tbody></table>
     </div>
   </section>
@@ -515,11 +519,12 @@ function parseMinutes(v){
 
 function aggregateRows(rows, groupKey){
   const map={};
-  // Kerätään myös ottelunumero vastustajille
   const oppGameNum={};
+  const oppPtsMap={};   // vastustajan pisteet per ottelu
+  const oppPlrMap={};   // pelaajamäärä per ottelu
   rows.forEach(r=>{
     const k=r[groupKey]; if(!k) return;
-    if(!map[k]) map[k]={label:k,gp:new Set(),pts:0,min:0,minHasData:false,fgm:0,fga:0,t3m:0,t3a:0,ftm:0,fta:0,orb:0,drb:0,rb:0,ast:0,stl:0,blk:0,to:0,pf:0};
+    if(!map[k]) map[k]={label:k,gp:new Set(),pts:0,min:0,minHasData:false,fgm:0,fga:0,t3m:0,t3a:0,ftm:0,fta:0,orb:0,drb:0,rb:0,ast:0,stl:0,blk:0,to:0,pf:0,plrSet:new Set()};
     const m=map[k];
     m.gp.add(r[COL.ottelu]);
     m.pts+=n(r[COL.pisteet]);
@@ -531,8 +536,12 @@ function aggregateRows(rows, groupKey){
     m.orb+=n(r[COL.orb]); m.drb+=n(r[COL.drb]); m.rb+=n(r[COL.rb]);
     m.ast+=n(r[COL.ast]); m.stl+=n(r[COL.stl]); m.blk+=n(r[COL.blk]);
     m.to+=n(r[COL.to]);   m.pf+=n(r[COL.pf]);
-    // tallenna ottelunumero vastustajataulua varten
-    if(groupKey===COL.vastustaja) oppGameNum[k]=r[COL.ottelu];
+    // pelaajat per ottelu (vastustajataulua varten)
+    if(r[COL.nimi]) m.plrSet.add(r[COL.nimi]);
+    if(groupKey===COL.vastustaja){
+      oppGameNum[k]=r[COL.ottelu];
+      oppPtsMap[k]=n(r[COL.vastPts]);
+    }
   });
   return Object.values(map).map(m=>{
     const g=m.gp.size;
@@ -542,11 +551,12 @@ function aggregateRows(rows, groupKey){
     const gameNum=oppGameNum[m.label]||999;
     return{
       label:m.label,
-      displayLabel: oppGameNum[m.label]!==undefined ? `O${oppGameNum[m.label]} ${m.label}` : m.label,
+      displayLabel:oppGameNum[m.label]!==undefined?`O${oppGameNum[m.label]} ${m.label}`:m.label,
       gameNum,
       gp:g,
-      pts:v(m.pts),
-      min:m.minHasData ? v(m.min) : '-',
+      oppPts:oppPtsMap[m.label]||'-',
+      plr:m.plrSet.size||'-',
+      pts:v(m.pts), min:m.minHasData?v(m.min):'-',
       fgm:v(m.fgm), fga:v(m.fga), fgpct:pct(m.fgm,m.fga),
       t3m:v(m.t3m), t3a:v(m.t3a), t3pct:pct(m.t3m,m.t3a),
       ftm:v(m.ftm), fta:v(m.fta), ftpct:pct(m.ftm,m.fta),
@@ -556,28 +566,65 @@ function aggregateRows(rows, groupKey){
   });
 }
 
-const STAT_COLS=['pts','min','fgm','fga','fgpct','t3m','t3a','t3pct','ftm','fta','ftpct','orb','drb','rb','ast','stl','blk','to','pf'];
+const STAT_COLS_P=['pts','min','fgm','fga','fgpct','t3m','t3a','t3pct','ftm','fta','ftpct','orb','drb','rb','ast','stl','blk','to','pf'];
+const STAT_COLS_O=['oppPts','plr','pts','min','fgm','fga','fgpct','t3m','t3a','t3pct','ftm','fta','ftpct','orb','drb','rb','ast','stl','blk','to','pf'];
 
-function sortAndRender(data, sKey, sDesc, tbodyId, clickFn, activeLabel, thPrefix){
+function makeTotalRow(data, statCols){
+  const total={label:'TOTAL',displayLabel:'TOTAL',gameNum:-1,gp:0,oppPts:0,plr:'-'};
+  statCols.forEach(k=>total[k]=0);
+  let hasMins=false, totalGP=0;
+  data.forEach(r=>{
+    totalGP+=r.gp||0;
+    statCols.forEach(k=>{
+      if(k==='fgpct'||k==='t3pct'||k==='ftpct') return; // lasketaan erikseen
+      if(k==='plr'||k==='oppPts') return;
+      if(r[k]!=='-'&&r[k]!=null) { total[k]=+(+total[k]+ +r[k]).toFixed(1); if(k==='min') hasMins=true; }
+    });
+    if(r.oppPts!=='-') total.oppPts=+(+total.oppPts + +r.oppPts).toFixed(0);
+  });
+  total.gp=totalGP;
+  if(!hasMins) total.min='-';
+  // Laske prosentit yhteistilastoista
+  total.fgpct=total.fga>0?+(total.fgm/total.fga*100).toFixed(1):'-';
+  total.t3pct=total.t3a>0?+(total.t3m/total.t3a*100).toFixed(1):'-';
+  total.ftpct=total.fta>0?+(total.ftm/total.fta*100).toFixed(1):'-';
+  if(tblMode==='ppeli'){
+    // per peli -tilassa jaa pelimäärällä
+    const div=data.length>0?data[0].gp:1;
+    statCols.forEach(k=>{
+      if(k==='fgpct'||k==='t3pct'||k==='ftpct'||k==='plr') return;
+      if(total[k]!=='-') total[k]=+(total[k]/data.length).toFixed(1);
+    });
+  }
+  return total;
+}
+
+function sortAndRender(data, sKey, sDesc, tbodyId, clickFn, activeLabel, thPrefix, statCols){
   data.sort((a,b)=>{
-    if(sKey==='label') return sDesc ? b.gameNum-a.gameNum : a.gameNum-b.gameNum;
+    if(sKey==='label') return sDesc?b.gameNum-a.gameNum:a.gameNum-b.gameNum;
     if(sKey==='gp') return sDesc?b.gp-a.gp:a.gp-b.gp;
     const av=a[sKey]==='-'?-1:+(a[sKey]??0);
     const bv=b[sKey]==='-'?-1:+(b[sKey]??0);
     return sDesc?bv-av:av-bv;
   });
   const mx={};
-  STAT_COLS.forEach(k=>{ const vals=data.map(r=>r[k]==='-'?0:+(r[k]||0)); mx[k]=Math.max(...vals); });
+  statCols.forEach(k=>{ const vals=data.map(r=>r[k]==='-'?0:+(r[k]||0)); mx[k]=Math.max(...vals); });
 
-  document.getElementById(tbodyId).innerHTML=data.map(r=>`
+  const total=makeTotalRow(data, statCols);
+  const totalHtml=`<tr class="total-row">
+    <td>TOTAL</td><td>${total.gp}</td>
+    ${statCols.map(k=>`<td>${total[k]!==undefined?total[k]:'-'}</td>`).join('')}
+  </tr>`;
+
+  document.getElementById(tbodyId).innerHTML = totalHtml + data.map(r=>`
     <tr onclick="${clickFn}('${r.label.replace(/'/g,"\\'")}',this)" style="cursor:pointer;${activeLabel===r.label?'background:rgba(240,165,0,.12);outline:1px solid var(--accent);':''}">
       <td style="white-space:nowrap">${r.displayLabel||r.label}</td>
       <td>${r.gp}</td>
-      ${STAT_COLS.map(k=>`<td class="${r[k]!=='-'&&+(r[k]||0)===mx[k]&&mx[k]>0?'hl':''}">${r[k]}</td>`).join('')}
+      ${statCols.map(k=>`<td class="${r[k]!=='-'&&+(r[k]||0)===mx[k]&&mx[k]>0?'hl':''}">${r[k]}</td>`).join('')}
     </tr>`).join('');
 
   document.querySelectorAll(`#${thPrefix} th`).forEach(t=>t.classList.remove('sa','sd'));
-  const keys=['label','gp',...STAT_COLS];
+  const keys=['label','gp',...statCols];
   const idx=keys.indexOf(sKey);
   const ths=document.querySelectorAll(`#${thPrefix} th`);
   if(idx>=0&&ths[idx]) ths[idx].classList.add(sDesc?'sd':'sa');
@@ -593,20 +640,14 @@ function getFilteredRows(){
 function renderBothTables(){
   const baseRows=allRows.filter(r=>r[COL.kausi]===curSeason&&r[COL.sarja]==='Sarja');
 
-  // Pelaajataulukko: suodatetaan vastustajan mukaan jos valittu
   const pRows=activeOpp?baseRows.filter(r=>r[COL.vastustaja]===activeOpp):baseRows;
   const pData=aggregateRows(pRows, COL.nimi);
-  sortAndRender(pData,sKeyP,sDescP,'tbP','clickPlayer',activePlayer,'playerTable');
+  sortAndRender(pData,sKeyP,sDescP,'tbP','clickPlayer',activePlayer,'playerTable',STAT_COLS_P);
 
-  // Vastustajtaulukko: suodatetaan pelaajan mukaan jos valittu
-  // Vastustajarivit: yksi rivi per ottelu per vastustaja, joten aggregoi ottelunumeron kautta
   const oRows=activePlayer?baseRows.filter(r=>r[COL.nimi]===activePlayer):baseRows;
-  // Deduploi pelaajittain: vastustajariveillä ei pidä laskea samaa ottelua moneen kertaan
-  // -> kerää per ottelu per vastustaja vain pelaajan rivit
   const oData=aggregateRows(oRows, COL.vastustaja);
-  sortAndRender(oData,sKeyO,sDescO,'tbO','clickOpp',activeOpp,'oppTable');
+  sortAndRender(oData,sKeyO,sDescO,'tbO','clickOpp',activeOpp,'oppTable',STAT_COLS_O);
 
-  // Päivitä otsikot
   document.getElementById('p1label').innerHTML=`Pelaajat ${activeOpp?`<small style="color:var(--accent)">— ${activeOpp}</small>`:''}
     <span id="filterBadge" style="display:${activePlayer||activeOpp?'inline':'none'};background:var(--accent);color:#0d0f14;border-radius:4px;padding:2px 8px;font-size:.7rem;margin-left:8px;cursor:pointer" onclick="clearFilter()">✕ Tyhjennä suodatin</span>`;
   document.getElementById('p2label').innerHTML=`Vastustajat ${activePlayer?`<small style="color:var(--accent)">— ${activePlayer}</small>`:''}`;
