@@ -99,7 +99,13 @@
   </section>
   <section id="timeline" class="section">
     <h2>Pistekehitys ottelusta toiseen</h2><p class="sdesc">Valitse pelaajat.</p>
-    <div class="chip-row" id="tlChips"></div>
+    <div style="display:flex;align-items:center;gap:10px;margin-bottom:14px;flex-wrap:wrap">
+      <div class="chip-row" id="tlChips" style="margin-bottom:0;flex:1"></div>
+      <div style="display:flex;background:var(--surface2);border:1px solid var(--border);border-radius:8px;overflow:hidden;flex-shrink:0">
+        <button id="btnPeli" onclick="setTlMode('peli')" style="padding:7px 16px;border:none;background:var(--accent);color:#0d0f14;font-family:'DM Sans',sans-serif;font-size:.8rem;font-weight:600;cursor:pointer">Per peli</button>
+        <button id="btnKumu" onclick="setTlMode('kumu')" style="padding:7px 16px;border:none;background:transparent;color:var(--muted);font-family:'DM Sans',sans-serif;font-size:.8rem;font-weight:500;cursor:pointer">Kumulatiivinen</button>
+      </div>
+    </div>
     <span class="mobile-hint">👆 Voit vierittää kaaviota sivusuunnassa</span>
     <div class="mobile-scroll"><div class="cbox"><canvas id="tlC" height="180"></canvas></div></div>
   </section>
@@ -145,6 +151,18 @@ let pStats={}, gData={}, tGames=[], players=[];
 let r1='', r2='', tlSel=new Set();
 let rChart, tlChart, tmChart;
 let sKey='EFF', sDesc=true;
+let tlMode='peli'; // 'peli' tai 'kumu'
+
+function setTlMode(mode){
+  tlMode=mode;
+  document.getElementById('btnPeli').style.background=mode==='peli'?'var(--accent)':'transparent';
+  document.getElementById('btnPeli').style.color=mode==='peli'?'#0d0f14':'var(--muted)';
+  document.getElementById('btnPeli').style.fontWeight=mode==='peli'?'600':'500';
+  document.getElementById('btnKumu').style.background=mode==='kumu'?'var(--accent)':'transparent';
+  document.getElementById('btnKumu').style.color=mode==='kumu'?'#0d0f14':'var(--muted)';
+  document.getElementById('btnKumu').style.fontWeight=mode==='kumu'?'600':'500';
+  buildTimeline();
+}
 
 // ── Fetch Apps Scriptistä (ei CORS-ongelmia) ──────────────
 async function loadData() {
@@ -245,7 +263,7 @@ function updateRecord(){
 }
 
 const RK=['PPG','RPG','APG','SPG','BPG','FGp','AT'];
-const RL=['Pisteet','Levypallot','Syötöt','Riistot','Blokit','FG%','AST/TO'];
+const RL=['Pisteet','Levypallot','Syötöt','Taklaukset','Blokkarit','FG%','AST/TO'];
 function norm(k,v){ const mx=Math.max(...players.map(p=>pStats[p]?.[k]||0)); return mx>0?Math.round(v/mx*100):0; }
 
 function buildRadarChips(){
@@ -293,16 +311,74 @@ function buildTimeline(){
   const labels=tGames.map(g=>`O${g[COL.ottelu]} ${(g[COL.vastustaja]||'').split(' ')[0]}`);
   const datasets=[...tlSel].map(p => {
     const col=PAL[players.indexOf(p)%PAL.length];
-    const pts=gns.map(gn => { const e=(gData[p]||[]).find(d=>d.g===gn); return e?e.pts:null; });
-    return{label:p,data:pts,borderColor:col,backgroundColor:col+'33',pointBackgroundColor:col,tension:.3,spanGaps:true,borderWidth:2,pointRadius:5,pointHoverRadius:7};
+    const perGame=gns.map(gn => { const e=(gData[p]||[]).find(d=>d.g===gn); return e?e.pts:null; });
+    let data;
+    if(tlMode==='kumu'){
+      let sum=0;
+      data=perGame.map(v => { if(v!==null) sum+=v; return v!==null?sum:null; });
+    } else {
+      data=perGame;
+    }
+    return{label:p,data,borderColor:col,backgroundColor:col+'33',pointBackgroundColor:col,tension:.3,spanGaps:true,borderWidth:2,pointRadius:5,pointHoverRadius:7};
   });
+
+  // Joukkueen keskiarvo per ottelu
+  if(tlMode==='peli'){
+    const avgData=gns.map(gn=>{
+      const gamePts=players.map(p=>{
+        const e=(gData[p]||[]).find(d=>d.g===gn);
+        return e?e.pts:null;
+      }).filter(v=>v!==null);
+      return gamePts.length>0 ? +(gamePts.reduce((a,b)=>a+b,0)/gamePts.length).toFixed(1) : null;
+    });
+    datasets.push({
+      label:'Joukkueen ka.',
+      data:avgData,
+      borderColor:'rgba(255,255,255,0.4)',
+      backgroundColor:'transparent',
+      borderDash:[6,4],
+      borderWidth:2,
+      pointRadius:0,
+      pointHoverRadius:4,
+      tension:.3,
+      spanGaps:true,
+    });
+  } else {
+    // Kumulatiivisessa tilassa: kasvava keskiarvo
+    let cumSum=0, cumCount=0;
+    const avgData=gns.map(gn=>{
+      const gamePts=players.map(p=>{
+        const e=(gData[p]||[]).find(d=>d.g===gn);
+        return e?e.pts:null;
+      }).filter(v=>v!==null);
+      if(gamePts.length>0){
+        cumSum+=gamePts.reduce((a,b)=>a+b,0)/gamePts.length;
+        cumCount++;
+        return +cumSum.toFixed(1);
+      }
+      return null;
+    });
+    datasets.push({
+      label:'Joukkueen ka.',
+      data:avgData,
+      borderColor:'rgba(255,255,255,0.4)',
+      backgroundColor:'transparent',
+      borderDash:[6,4],
+      borderWidth:2,
+      pointRadius:0,
+      pointHoverRadius:4,
+      tension:.3,
+      spanGaps:true,
+    });
+  }
+
   if(tlChart) tlChart.destroy();
   tlChart=new Chart(ctx,{type:'line',data:{labels,datasets},options:{
     responsive:true, maintainAspectRatio:true,
     plugins:{legend:{labels:{color:'#e8eaf0',font:{family:"'DM Sans'",size:12},boxWidth:12,padding:16}},tooltip:{mode:'index',intersect:false}},
     scales:{
       x:{ticks:{color:'#7a8090',font:{size:11},maxRotation:45,minRotation:30},grid:{color:'rgba(255,255,255,.05)'}},
-      y:{ticks:{color:'#7a8090'},grid:{color:'rgba(255,255,255,.05)'},title:{display:true,text:'Pisteet',color:'#7a8090'}}
+      y:{ticks:{color:'#7a8090'},grid:{color:'rgba(255,255,255,.05)'},title:{display:true,text:tlMode==='kumu'?'Pisteet yhteensä':'Pisteet per peli',color:'#7a8090'}}
     }
   }});
 }
