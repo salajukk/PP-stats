@@ -186,7 +186,7 @@
 </div>
 
 <script>
-const APPS_SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbxeFJaBz1s2qHb8II4uzQOVwfjlSSXkpRDwpDY4Mhvj_C3C7GxgtalBtFrotGR4zjPDeQ/exec';
+const APPS_SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbxDmjX_6lmtpLIcJm_AzlT3on5jeG_jAp-Q_9XxRqFr1GOgnJHYGtKw_-nGxNwH0z8XcQ/exec';
 const PAL = ['#f0a500','#5b8dee','#3ecf8e','#e05a2b','#c084fc','#f472b6','#34d399','#fb923c','#60a5fa','#a78bfa','#fbbf24','#4ade80'];
 
 const COL = {
@@ -317,7 +317,7 @@ function updateRecord(){
 }
 
 const RK=['PPG','RPG','APG','SPG','BPG','FGp','AT'];
-const RL=['Pisteet','Levypallot','Syötöt','Taklaukset','Blokkarit','FG%','AST/TO'];
+const RL=['Pisteet','Levypallot','Syötöt','Riistot','Blokit','FG%','AST/TO'];
 function norm(k,v){ const mx=Math.max(...players.map(p=>pStats[p]?.[k]||0)); return mx>0?Math.round(v/mx*100):0; }
 
 function buildRadarChips(){
@@ -490,17 +490,23 @@ function setTblMode(m){
 }
 
 // Aggregoi rivit ryhmittäin
-// Muuntaa hh:mm:ss tai desimaaliajan minuuteiksi
+// Muuntaa Pl. Time minuuteiksi — käsittelee kaikki Apps Scriptin lähettämät muodot
 function parseMinutes(v){
-  if(v==null||v==='') return null;
-  if(typeof v==='number'){
-    if(v===0) return null;
-    return +(v*24*60).toFixed(1);
-  }
+  if(v==null||v===''||v===0) return null;
+  // Numero: Google Sheets aikadesimaali (1.0 = 24h)
+  if(typeof v==='number') return +(v*24*60).toFixed(1);
+  // Objekti: Apps Script saattaa lähettää Date-objektin serialisoituna
+  if(typeof v==='object') return null;
   if(typeof v==='string'){
-    const parts=v.split(':');
+    const s=v.trim();
+    if(s===''||s==='0') return null;
+    // hh:mm:ss tai mm:ss
+    const parts=s.split(':');
     if(parts.length===3) return +(+parts[0]*60 + +parts[1] + +parts[2]/60).toFixed(1);
     if(parts.length===2) return +(+parts[0]*60 + +parts[1]).toFixed(1);
+    // pelkkä numero merkkijonona
+    const num=parseFloat(s);
+    if(!isNaN(num)&&num>0&&num<1) return +(num*24*60).toFixed(1);
   }
   return null;
 }
