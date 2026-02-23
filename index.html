@@ -186,7 +186,7 @@
 </div>
 
 <script>
-const APPS_SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbxDmjX_6lmtpLIcJm_AzlT3on5jeG_jAp-Q_9XxRqFr1GOgnJHYGtKw_-nGxNwH0z8XcQ/exec';
+const APPS_SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbyyDbxGfzz3nuDHoqRB6rTy9tYj1vDWbPW159O2OQzsmEfRFCnN92h_bp6qfAMwFo4vMA/exec';
 const PAL = ['#f0a500','#5b8dee','#3ecf8e','#e05a2b','#c084fc','#f472b6','#34d399','#fb923c','#60a5fa','#a78bfa','#fbbf24','#4ade80'];
 
 const COL = {
@@ -490,23 +490,25 @@ function setTblMode(m){
 }
 
 // Aggregoi rivit ryhmittäin
-// Muuntaa Pl. Time minuuteiksi — käsittelee kaikki Apps Scriptin lähettämät muodot
 function parseMinutes(v){
   if(v==null||v===''||v===0) return null;
-  // Numero: Google Sheets aikadesimaali (1.0 = 24h)
   if(typeof v==='number') return +(v*24*60).toFixed(1);
-  // Objekti: Apps Script saattaa lähettää Date-objektin serialisoituna
-  if(typeof v==='object') return null;
   if(typeof v==='string'){
     const s=v.trim();
-    if(s===''||s==='0') return null;
-    // hh:mm:ss tai mm:ss
+    if(s==='') return null;
+    // Apps Script palauttaa muodon "1899-12-29T22:43:29.000Z"
+    // Otetaan vain aika-osa T:n jälkeen ja Z:n edestä
+    const isoMatch=s.match(/T(\d{2}):(\d{2}):(\d{2})/);
+    if(isoMatch){
+      const h=+isoMatch[1], m=+isoMatch[2], sec=+isoMatch[3];
+      // UTC+2 offset (Helsinki) — lisätään 2h
+      const totalMin=h*60+m+sec/60+120;
+      return +totalMin.toFixed(1);
+    }
+    // hh:mm:ss
     const parts=s.split(':');
     if(parts.length===3) return +(+parts[0]*60 + +parts[1] + +parts[2]/60).toFixed(1);
     if(parts.length===2) return +(+parts[0]*60 + +parts[1]).toFixed(1);
-    // pelkkä numero merkkijonona
-    const num=parseFloat(s);
-    if(!isNaN(num)&&num>0&&num<1) return +(num*24*60).toFixed(1);
   }
   return null;
 }
