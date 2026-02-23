@@ -245,7 +245,7 @@ function updateRecord(){
 }
 
 const RK=['PPG','RPG','APG','SPG','BPG','FGp','AT'];
-const RL=['Pisteet','Levypallot','Syötöt','Taklaukset','Blokkarit','FG%','AST/TO'];
+const RL=['Pisteet','Levypallot','Syötöt','Riistot','Blokit','FG%','AST/TO'];
 function norm(k,v){ const mx=Math.max(...players.map(p=>pStats[p]?.[k]||0)); return mx>0?Math.round(v/mx*100):0; }
 
 function buildRadarChips(){
