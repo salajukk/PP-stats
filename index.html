@@ -520,11 +520,15 @@ function parseMinutes(v){
 function aggregateRows(rows, groupKey){
   const map={};
   const oppGameNum={};
-  const oppPtsMap={};   // vastustajan pisteet per ottelu
-  const oppPlrMap={};   // pelaajamäärä per ottelu
+  const oppPtsMap={};
   rows.forEach(r=>{
-    const k=r[groupKey]; if(!k) return;
-    if(!map[k]) map[k]={label:k,gp:new Set(),pts:0,min:0,minHasData:false,fgm:0,fga:0,t3m:0,t3a:0,ftm:0,fta:0,orb:0,drb:0,rb:0,ast:0,stl:0,blk:0,to:0,pf:0,plrSet:new Set()};
+    const rawKey=r[groupKey]; if(!rawKey) return;
+    // Vastustajataulussa: käytetään ottelunumero+nimi avaimena jotta sama vastustaja
+    // kahdessa eri pelissä saa omat rivinsä
+    const k = groupKey===COL.vastustaja
+      ? `${r[COL.ottelu]}__${rawKey}`
+      : rawKey;
+    if(!map[k]) map[k]={label:rawKey,gp:new Set(),pts:0,min:0,minHasData:false,fgm:0,fga:0,t3m:0,t3a:0,ftm:0,fta:0,orb:0,drb:0,rb:0,ast:0,stl:0,blk:0,to:0,pf:0,plrSet:new Set()};
     const m=map[k];
     m.gp.add(r[COL.ottelu]);
     m.pts+=n(r[COL.pisteet]);
@@ -536,7 +540,6 @@ function aggregateRows(rows, groupKey){
     m.orb+=n(r[COL.orb]); m.drb+=n(r[COL.drb]); m.rb+=n(r[COL.rb]);
     m.ast+=n(r[COL.ast]); m.stl+=n(r[COL.stl]); m.blk+=n(r[COL.blk]);
     m.to+=n(r[COL.to]);   m.pf+=n(r[COL.pf]);
-    // pelaajat per ottelu (vastustajataulua varten)
     if(r[COL.nimi]) m.plrSet.add(r[COL.nimi]);
     if(groupKey===COL.vastustaja){
       oppGameNum[k]=r[COL.ottelu];
@@ -548,13 +551,15 @@ function aggregateRows(rows, groupKey){
     const div=tblMode==='ppeli'?g:1;
     const pct=(a,b)=>b>0?+(a/b*100).toFixed(1):'-';
     const v=x=>+(tblMode==='ppeli'?(x/div):(x)).toFixed(1);
-    const gameNum=oppGameNum[m.label]||999;
+    // gameNum löytyy map-avaimesta
+    const mapKey=Object.keys(map).find(k=>map[k]===m);
+    const gameNum=oppGameNum[mapKey]||999;
     return{
       label:m.label,
-      displayLabel:oppGameNum[m.label]!==undefined?`O${oppGameNum[m.label]} ${m.label}`:m.label,
+      displayLabel:oppGameNum[mapKey]!==undefined?`O${oppGameNum[mapKey]} ${m.label}`:m.label,
       gameNum,
       gp:g,
-      oppPts:oppPtsMap[m.label]||'-',
+      oppPts:oppPtsMap[mapKey]||'-',
       plr:m.plrSet.size||'-',
       pts:v(m.pts), min:m.minHasData?v(m.min):'-',
       fgm:v(m.fgm), fga:v(m.fga), fgpct:pct(m.fgm,m.fga),
@@ -617,12 +622,15 @@ function sortAndRender(data, sKey, sDesc, tbodyId, clickFn, activeLabel, thPrefi
     ${statCols.map(k=>`<td>${total[k]!==undefined?total[k]:'-'}</td>`).join('')}
   </tr>`;
 
-  document.getElementById(tbodyId).innerHTML = totalHtml + data.map(r=>`
-    <tr onclick="${clickFn}('${r.label.replace(/'/g,"\\'")}',this)" style="cursor:pointer;${activeLabel===r.label?'background:rgba(240,165,0,.12);outline:1px solid var(--accent);':''}">
+  document.getElementById(tbodyId).innerHTML = totalHtml + data.map(r=>{
+    const rowKey = statCols===STAT_COLS_O ? `${r.gameNum}__${r.label}` : r.label;
+    const isActive = statCols===STAT_COLS_O ? activeOpp===rowKey : activePlayer===r.label;
+    return `<tr onclick="${clickFn}('${r.label.replace(/'/g,"\\'")}',this)" style="cursor:pointer;${isActive?'background:rgba(240,165,0,.12);outline:1px solid var(--accent);':''}">
       <td style="white-space:nowrap">${r.displayLabel||r.label}</td>
       ${statCols===STAT_COLS_P ? `<td>${r.gp}</td>` : ''}
       ${statCols.map(k=>`<td class="${r[k]!=='-'&&+(r[k]||0)===mx[k]&&mx[k]>0?'hl':''}">${r[k]}</td>`).join('')}
-    </tr>`).join('');
+    </tr>`;
+  }).join('');
 
   document.querySelectorAll(`#${thPrefix} th`).forEach(t=>t.classList.remove('sa','sd'));
   const keys=statCols===STAT_COLS_P ? ['label','gp',...statCols] : ['label',...statCols];
@@ -641,7 +649,13 @@ function getFilteredRows(){
 function renderBothTables(){
   const baseRows=allRows.filter(r=>r[COL.kausi]===curSeason&&r[COL.sarja]==='Sarja');
 
-  const pRows=activeOpp?baseRows.filter(r=>r[COL.vastustaja]===activeOpp):baseRows;
+  // activeOpp on muotoa "12__Vastustajan nimi" tai null
+  const activeOppName = activeOpp ? activeOpp.split('__').slice(1).join('__') : null;
+  const activeOppGame = activeOpp ? +activeOpp.split('__')[0] : null;
+
+  const pRows=activeOpp
+    ? baseRows.filter(r=>r[COL.vastustaja]===activeOppName && n(r[COL.ottelu])===activeOppGame)
+    : baseRows;
   const pData=aggregateRows(pRows, COL.nimi);
   sortAndRender(pData,sKeyP,sDescP,'tbP','clickPlayer',activePlayer,'playerTable',STAT_COLS_P);
 
@@ -649,7 +663,7 @@ function renderBothTables(){
   const oData=aggregateRows(oRows, COL.vastustaja);
   sortAndRender(oData,sKeyO,sDescO,'tbO','clickOpp',activeOpp,'oppTable',STAT_COLS_O);
 
-  document.getElementById('p1label').innerHTML=`Pelaajat ${activeOpp?`<small style="color:var(--accent)">— ${activeOpp}</small>`:''}
+  document.getElementById('p1label').innerHTML=`Pelaajat ${activeOppName?`<small style="color:var(--accent)">— ${activeOppName}</small>`:''}
     <span id="filterBadge" style="display:${activePlayer||activeOpp?'inline':'none'};background:var(--accent);color:#0d0f14;border-radius:4px;padding:2px 8px;font-size:.7rem;margin-left:8px;cursor:pointer" onclick="clearFilter()">✕ Tyhjennä suodatin</span>`;
   document.getElementById('p2label').innerHTML=`Vastustajat ${activePlayer?`<small style="color:var(--accent)">— ${activePlayer}</small>`:''}`;
 }
@@ -661,7 +675,11 @@ function clickPlayer(name, tr){
 }
 
 function clickOpp(name, tr){
-  activeOpp = activeOpp===name ? null : name;
+  // Hae ottelunumero rivin displayLabel-tekstistä (muoto "O12 Nimi")
+  const gameNumMatch = tr.querySelector('td')?.textContent?.match(/^O(\d+)/);
+  const gameNum = gameNumMatch ? +gameNumMatch[1] : null;
+  const key = gameNum ? `${gameNum}__${name}` : name;
+  activeOpp = activeOpp===key ? null : key;
   activePlayer=null;
   renderBothTables();
 }
