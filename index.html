@@ -529,17 +529,36 @@ function aggregateRows(rows, groupKey){
   const oppPtsMap={};
   rows.forEach(r=>{
     const rawKey=r[groupKey]; if(!rawKey) return;
-    // Vastustajataulussa: käytetään ottelunumero+nimi avaimena jotta sama vastustaja
-    // kahdessa eri pelissä saa omat rivinsä
     const k = groupKey===COL.vastustaja
       ? `${r[COL.ottelu]}__${rawKey}`
       : rawKey;
-    if(!map[k]) map[k]={label:rawKey,gp:new Set(),pts:0,min:0,minHasData:false,fgm:0,fga:0,t3m:0,t3a:0,ftm:0,fta:0,orb:0,drb:0,rb:0,ast:0,stl:0,blk:0,to:0,pf:0,plrSet:new Set()};
+    if(!map[k]) map[k]={
+      label:rawKey,
+      gp:new Set(),       // kaikki pelit (pisteet)
+      gpAdv:new Set(),    // pelit joissa lisätilastoja (FGM jne.)
+      gpMin:new Set(),    // pelit joissa minuutit
+      pts:0,min:0,minHasData:false,
+      fgm:0,fga:0,t3m:0,t3a:0,ftm:0,fta:0,
+      orb:0,drb:0,rb:0,ast:0,stl:0,blk:0,to:0,pf:0,
+      plrSet:new Set()
+    };
     const m=map[k];
     m.gp.add(r[COL.ottelu]);
     m.pts+=n(r[COL.pisteet]);
     const mins=parseMinutes(r['Pl. Time']);
-    if(mins!==null){ m.min+=mins; m.minHasData=true; }
+    if(mins!==null){ m.min+=mins; m.minHasData=true; m.gpMin.add(r[COL.ottelu]); }
+    // Merkitään peli tilastoiduksi jos FGA > 0 (jos ei heitetty kertaakaan, FGA=0 ja FGM=0
+    // mutta peli on silti tilastoitu — tarkistetaan siis muistakin kentistä)
+    const hasAdv = n(r[COL.fga]) > 0 ||
+                   n(r[COL.t3a]) > 0 ||
+                   n(r[COL.fta]) > 0 ||
+                   n(r[COL.rb])  > 0 ||
+                   n(r[COL.ast]) > 0 ||
+                   n(r[COL.stl]) > 0 ||
+                   n(r[COL.blk]) > 0 ||
+                   n(r[COL.to])  > 0 ||
+                   n(r[COL.pf])  > 0;
+    if(hasAdv) m.gpAdv.add(r[COL.ottelu]);
     m.fgm+=n(r[COL.fgm]); m.fga+=n(r[COL.fga]);
     m.t3m+=n(r[COL.t3m]); m.t3a+=n(r[COL.t3a]);
     m.ftm+=n(r[COL.ftm]); m.fta+=n(r[COL.fta]);
@@ -554,14 +573,19 @@ function aggregateRows(rows, groupKey){
   });
   return Object.values(map).map(m=>{
     const g=m.gp.size;
-    const div=tblMode==='ppeli'?g:1;
+    const gAdv=m.gpAdv.size||1;  // pelit joissa lisätilastoja
+    const gMin=m.gpMin.size||1;  // pelit joissa minuutit
+    const ppeli=tblMode==='ppeli';
     const pct=(a,b)=>b>0?+(a/b*100).toFixed(1):'-';
-    const v=x=>+(tblMode==='ppeli'?(x/div):(x)).toFixed(1);
-    // gameNum löytyy map-avaimesta
+    // Pisteet jaetaan kaikilla peleillä, MIN omalla, muut lisätilastopeleillä
+    const vPts=x=>ppeli?+(x/g).toFixed(1):+x.toFixed(1);
+    const vMin=x=>ppeli?+(x/gMin).toFixed(1):+x.toFixed(1);
+    const vAdv=x=>ppeli?+(x/gAdv).toFixed(1):+x.toFixed(1);
     const mapKey=Object.keys(map).find(k=>map[k]===m);
     const gameNum=oppGameNum[mapKey]||999;
     const t2m=m.fgm-m.t3m;
     const t2a=m.fga-m.t3a;
+    const hasAdv=m.gpAdv.size>0;
     return{
       label:m.label,
       displayLabel:oppGameNum[mapKey]!==undefined?`O${oppGameNum[mapKey]} ${m.label}`:m.label,
@@ -569,13 +593,15 @@ function aggregateRows(rows, groupKey){
       gp:g,
       oppPts:oppPtsMap[mapKey]||'-',
       plr:m.plrSet.size||'-',
-      pts:v(m.pts), min:m.minHasData?v(m.min):'-',
-      fgm:v(m.fgm), fga:v(m.fga), fgpct:pct(m.fgm,m.fga),
-      t2m:v(t2m), t2a:v(t2a), t2pct:pct(t2m,t2a),
-      t3m:v(m.t3m), t3a:v(m.t3a), t3pct:pct(m.t3m,m.t3a),
-      ftm:v(m.ftm), fta:v(m.fta), ftpct:pct(m.ftm,m.fta),
-      orb:v(m.orb), drb:v(m.drb), rb:v(m.rb),
-      ast:v(m.ast), stl:v(m.stl), blk:v(m.blk), to:v(m.to), pf:v(m.pf),
+      pts:vPts(m.pts),
+      min:m.minHasData?vMin(m.min):'-',
+      fgm:hasAdv?vAdv(m.fgm):'-', fga:hasAdv?vAdv(m.fga):'-', fgpct:hasAdv?pct(m.fgm,m.fga):'-',
+      t2m:hasAdv?vAdv(t2m):'-', t2a:hasAdv?vAdv(t2a):'-', t2pct:hasAdv?pct(t2m,t2a):'-',
+      t3m:hasAdv?vAdv(m.t3m):'-', t3a:hasAdv?vAdv(m.t3a):'-', t3pct:hasAdv?pct(m.t3m,m.t3a):'-',
+      ftm:hasAdv?vAdv(m.ftm):'-', fta:hasAdv?vAdv(m.fta):'-', ftpct:hasAdv?pct(m.ftm,m.fta):'-',
+      orb:hasAdv?vAdv(m.orb):'-', drb:hasAdv?vAdv(m.drb):'-', rb:hasAdv?vAdv(m.rb):'-',
+      ast:hasAdv?vAdv(m.ast):'-', stl:hasAdv?vAdv(m.stl):'-', blk:hasAdv?vAdv(m.blk):'-',
+      to:hasAdv?vAdv(m.to):'-', pf:hasAdv?vAdv(m.pf):'-',
     };
   });
 }
@@ -586,31 +612,43 @@ const STAT_COLS_O=['oppPts','plr','pts','min','fgm','fga','fgpct','t2m','t2a','t
 function makeTotalRow(data, statCols){
   const total={label:'TOTAL',displayLabel:'TOTAL',gameNum:-1,gp:0,oppPts:0,plr:'-'};
   statCols.forEach(k=>total[k]=0);
+  // Lasketaan montako riviä on tilastoitu per sarake
+  const counts={};
+  statCols.forEach(k=>counts[k]=0);
   let hasMins=false, totalGP=0;
   data.forEach(r=>{
     totalGP+=r.gp||0;
     statCols.forEach(k=>{
-      if(k==='fgpct'||k==='t2pct'||k==='t3pct'||k==='ftpct') return; // lasketaan erikseen
+      if(k==='fgpct'||k==='t2pct'||k==='t3pct'||k==='ftpct') return;
       if(k==='plr'||k==='oppPts') return;
-      if(r[k]!=='-'&&r[k]!=null) { total[k]=+(+total[k]+ +r[k]).toFixed(1); if(k==='min') hasMins=true; }
+      if(r[k]!=='-'&&r[k]!=null){
+        total[k]=+(+total[k]+ +r[k]).toFixed(1);
+        counts[k]++;
+        if(k==='min') hasMins=true;
+      }
     });
     if(r.oppPts!=='-') total.oppPts=+(+total.oppPts + +r.oppPts).toFixed(0);
   });
   total.gp=totalGP;
   if(!hasMins) total.min='-';
-  // Laske prosentit yhteistilastoista
-  total.fgpct=total.fga>0?+(total.fgm/total.fga*100).toFixed(1):'-';
-  total.t2pct=total.t2a>0?+(total.t2m/total.t2a*100).toFixed(1):'-';
-  total.t3pct=total.t3a>0?+(total.t3m/total.t3a*100).toFixed(1):'-';
-  total.ftpct=total.fta>0?+(total.ftm/total.fta*100).toFixed(1):'-';
+  // Laske prosentit yhteistilastoista (ennen per peli -jakoa)
+  const rawFgm=total.fgm, rawFga=total.fga;
+  const rawT2m=total.fgm-total.t3m, rawT2a=total.fga-total.t3a;
+  const rawT3m=total.t3m, rawT3a=total.t3a;
+  const rawFtm=total.ftm, rawFta=total.fta;
   if(tblMode==='ppeli'){
-    // per peli -tilassa jaa pelimäärällä
-    const div=data.length>0?data[0].gp:1;
+    // Jaa jokainen sarake omalla tilastoitujen pelien määrällä
     statCols.forEach(k=>{
-      if(k==='fgpct'||k==='t2pct'||k==='t3pct'||k==='ftpct'||k==='plr') return;
-      if(total[k]!=='-') total[k]=+(total[k]/data.length).toFixed(1);
+      if(k==='fgpct'||k==='t2pct'||k==='t3pct'||k==='ftpct'||k==='plr'||k==='oppPts') return;
+      if(total[k]!=='-'&&counts[k]>0) total[k]=+(total[k]/counts[k]).toFixed(1);
     });
+    if(total.oppPts!=='-') total.oppPts=+(total.oppPts/data.length).toFixed(1);
   }
+  // Prosentit lasketaan raakaluvuista (ei per peli -jaetuista)
+  total.fgpct=rawFga>0?+(rawFgm/rawFga*100).toFixed(1):'-';
+  total.t2pct=rawT2a>0?+(rawT2m/rawT2a*100).toFixed(1):'-';
+  total.t3pct=rawT3a>0?+(rawT3m/rawT3a*100).toFixed(1):'-';
+  total.ftpct=rawFta>0?+(rawFtm/rawFta*100).toFixed(1):'-';
   return total;
 }
 
