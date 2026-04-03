@@ -612,12 +612,19 @@ const STAT_COLS_O=['oppPts','plr','pts','min','fgm','fga','fgpct','t2m','t2a','t
 function makeTotalRow(data, statCols){
   const total={label:'TOTAL',displayLabel:'TOTAL',gameNum:-1,gp:0,oppPts:0,plr:'-'};
   statCols.forEach(k=>total[k]=0);
-  // Lasketaan montako riviä on tilastoitu per sarake
   const counts={};
   statCols.forEach(k=>counts[k]=0);
+  // Raakasummat prosentteja varten — kerätään erikseen koska data on jo per-peli arvoja
+  const raw={fgm:0,fga:0,t3m:0,t3a:0,ftm:0,fta:0};
+  const rawCounts={fgm:0,fga:0,t3m:0,t3a:0,ftm:0,fta:0};
   let hasMins=false, totalGP=0;
   data.forEach(r=>{
     totalGP+=r.gp||0;
+    // Kerää raakasummat kertomalla per-peli arvo takaisin pelimäärällä
+    const g=r.gp||1;
+    ['fgm','fga','t3m','t3a','ftm','fta'].forEach(k=>{
+      if(r[k]!=='-'&&r[k]!=null){ raw[k]+=+(r[k])*g; rawCounts[k]+=g; }
+    });
     statCols.forEach(k=>{
       if(k==='fgpct'||k==='t2pct'||k==='t3pct'||k==='ftpct') return;
       if(k==='plr'||k==='oppPts') return;
@@ -631,24 +638,20 @@ function makeTotalRow(data, statCols){
   });
   total.gp=totalGP;
   if(!hasMins) total.min='-';
-  // Laske prosentit yhteistilastoista (ennen per peli -jakoa)
-  const rawFgm=total.fgm, rawFga=total.fga;
-  const rawT2m=total.fgm-total.t3m, rawT2a=total.fga-total.t3a;
-  const rawT3m=total.t3m, rawT3a=total.t3a;
-  const rawFtm=total.ftm, rawFta=total.fta;
   if(tblMode==='ppeli'){
-    // Jaa jokainen sarake omalla tilastoitujen pelien määrällä
     statCols.forEach(k=>{
       if(k==='fgpct'||k==='t2pct'||k==='t3pct'||k==='ftpct'||k==='plr'||k==='oppPts') return;
       if(total[k]!=='-'&&counts[k]>0) total[k]=+(total[k]/counts[k]).toFixed(1);
     });
     if(total.oppPts!=='-') total.oppPts=+(total.oppPts/data.length).toFixed(1);
   }
-  // Prosentit lasketaan raakaluvuista (ei per peli -jaetuista)
-  total.fgpct=rawFga>0?+(rawFgm/rawFga*100).toFixed(1):'-';
-  total.t2pct=rawT2a>0?+(rawT2m/rawT2a*100).toFixed(1):'-';
-  total.t3pct=rawT3a>0?+(rawT3m/rawT3a*100).toFixed(1):'-';
-  total.ftpct=rawFta>0?+(rawFtm/rawFta*100).toFixed(1):'-';
+  // Prosentit lasketaan aina raakasummista
+  const pct=(a,b)=>b>0?+(a/b*100).toFixed(1):'-';
+  const t2m=raw.fgm-raw.t3m, t2a=raw.fga-raw.t3a;
+  total.fgpct=pct(raw.fgm,raw.fga);
+  total.t2pct=pct(t2m,t2a);
+  total.t3pct=pct(raw.t3m,raw.t3a);
+  total.ftpct=pct(raw.ftm,raw.fta);
   return total;
 }
 
