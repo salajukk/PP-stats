@@ -142,6 +142,9 @@
         <th onclick="srtP('fgm')" title="Field Goals Made">FGM</th>
         <th onclick="srtP('fga')" title="Field Goals Attempted">FGA</th>
         <th onclick="srtP('fgpct')" title="Field Goal Percentage">FG%</th>
+        <th onclick="srtP('t2m')" title="2-Pointers Made">2PM</th>
+        <th onclick="srtP('t2a')" title="2-Pointers Attempted">2PA</th>
+        <th onclick="srtP('t2pct')" title="2-Point Percentage">2P%</th>
         <th onclick="srtP('t3m')" title="3-Pointers Made">3PM</th>
         <th onclick="srtP('t3a')" title="3-Pointers Attempted">3PA</th>
         <th onclick="srtP('t3pct')" title="3-Point Percentage">3P%</th>
@@ -170,6 +173,9 @@
         <th onclick="srtO('fgm')" title="Field Goals Made">FGM</th>
         <th onclick="srtO('fga')" title="Field Goals Attempted">FGA</th>
         <th onclick="srtO('fgpct')" title="Field Goal Percentage">FG%</th>
+        <th onclick="srtO('t2m')" title="2-Pointers Made">2PM</th>
+        <th onclick="srtO('t2a')" title="2-Pointers Attempted">2PA</th>
+        <th onclick="srtO('t2pct')" title="2-Point Percentage">2P%</th>
         <th onclick="srtO('t3m')" title="3-Pointers Made">3PM</th>
         <th onclick="srtO('t3a')" title="3-Pointers Attempted">3PA</th>
         <th onclick="srtO('t3pct')" title="3-Point Percentage">3P%</th>
@@ -554,6 +560,8 @@ function aggregateRows(rows, groupKey){
     // gameNum löytyy map-avaimesta
     const mapKey=Object.keys(map).find(k=>map[k]===m);
     const gameNum=oppGameNum[mapKey]||999;
+    const t2m=m.fgm-m.t3m;
+    const t2a=m.fga-m.t3a;
     return{
       label:m.label,
       displayLabel:oppGameNum[mapKey]!==undefined?`O${oppGameNum[mapKey]} ${m.label}`:m.label,
@@ -563,6 +571,7 @@ function aggregateRows(rows, groupKey){
       plr:m.plrSet.size||'-',
       pts:v(m.pts), min:m.minHasData?v(m.min):'-',
       fgm:v(m.fgm), fga:v(m.fga), fgpct:pct(m.fgm,m.fga),
+      t2m:v(t2m), t2a:v(t2a), t2pct:pct(t2m,t2a),
       t3m:v(m.t3m), t3a:v(m.t3a), t3pct:pct(m.t3m,m.t3a),
       ftm:v(m.ftm), fta:v(m.fta), ftpct:pct(m.ftm,m.fta),
       orb:v(m.orb), drb:v(m.drb), rb:v(m.rb),
@@ -571,8 +580,8 @@ function aggregateRows(rows, groupKey){
   });
 }
 
-const STAT_COLS_P=['pts','min','fgm','fga','fgpct','t3m','t3a','t3pct','ftm','fta','ftpct','orb','drb','rb','ast','stl','blk','to','pf'];
-const STAT_COLS_O=['oppPts','plr','pts','min','fgm','fga','fgpct','t3m','t3a','t3pct','ftm','fta','ftpct','orb','drb','rb','ast','stl','blk','to','pf'];
+const STAT_COLS_P=['pts','min','fgm','fga','fgpct','t2m','t2a','t2pct','t3m','t3a','t3pct','ftm','fta','ftpct','orb','drb','rb','ast','stl','blk','to','pf'];
+const STAT_COLS_O=['oppPts','plr','pts','min','fgm','fga','fgpct','t2m','t2a','t2pct','t3m','t3a','t3pct','ftm','fta','ftpct','orb','drb','rb','ast','stl','blk','to','pf'];
 
 function makeTotalRow(data, statCols){
   const total={label:'TOTAL',displayLabel:'TOTAL',gameNum:-1,gp:0,oppPts:0,plr:'-'};
@@ -581,7 +590,7 @@ function makeTotalRow(data, statCols){
   data.forEach(r=>{
     totalGP+=r.gp||0;
     statCols.forEach(k=>{
-      if(k==='fgpct'||k==='t3pct'||k==='ftpct') return; // lasketaan erikseen
+      if(k==='fgpct'||k==='t2pct'||k==='t3pct'||k==='ftpct') return; // lasketaan erikseen
       if(k==='plr'||k==='oppPts') return;
       if(r[k]!=='-'&&r[k]!=null) { total[k]=+(+total[k]+ +r[k]).toFixed(1); if(k==='min') hasMins=true; }
     });
@@ -591,13 +600,14 @@ function makeTotalRow(data, statCols){
   if(!hasMins) total.min='-';
   // Laske prosentit yhteistilastoista
   total.fgpct=total.fga>0?+(total.fgm/total.fga*100).toFixed(1):'-';
+  total.t2pct=total.t2a>0?+(total.t2m/total.t2a*100).toFixed(1):'-';
   total.t3pct=total.t3a>0?+(total.t3m/total.t3a*100).toFixed(1):'-';
   total.ftpct=total.fta>0?+(total.ftm/total.fta*100).toFixed(1):'-';
   if(tblMode==='ppeli'){
     // per peli -tilassa jaa pelimäärällä
     const div=data.length>0?data[0].gp:1;
     statCols.forEach(k=>{
-      if(k==='fgpct'||k==='t3pct'||k==='ftpct'||k==='plr') return;
+      if(k==='fgpct'||k==='t2pct'||k==='t3pct'||k==='ftpct'||k==='plr') return;
       if(total[k]!=='-') total[k]=+(total[k]/data.length).toFixed(1);
     });
   }
