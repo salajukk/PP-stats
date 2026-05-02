@@ -124,12 +124,18 @@
   </section>
   <section id="tbl" class="section">
     <h2>Tilastotaulukko</h2>
-    <div style="display:flex;align-items:center;gap:10px;margin-bottom:20px;flex-wrap:wrap">
+    <div style="display:flex;align-items:center;gap:10px;margin-bottom:16px;flex-wrap:wrap">
       <p class="sdesc" style="margin-bottom:0">Klikkaa riviä suodattaaksesi toisen taulukon.</p>
       <div style="display:flex;background:var(--surface2);border:1px solid var(--border);border-radius:8px;overflow:hidden;margin-left:auto;flex-shrink:0">
         <button id="btnYht" onclick="setTblMode('yht')" style="padding:7px 16px;border:none;background:var(--accent);color:#0d0f14;font-family:'DM Sans',sans-serif;font-size:.8rem;font-weight:600;cursor:pointer">Yhteensä</button>
         <button id="btnPPeli" onclick="setTblMode('ppeli')" style="padding:7px 16px;border:none;background:transparent;color:var(--muted);font-family:'DM Sans',sans-serif;font-size:.8rem;font-weight:500;cursor:pointer">Per peli</button>
       </div>
+    </div>
+    <!-- Kausivalinta on navissa -->
+    <div style="margin-bottom:20px;display:flex;justify-content:flex-end">
+      <button onclick="downloadCSV()" style="display:flex;align-items:center;gap:8px;padding:10px 18px;background:var(--surface2);border:1px solid var(--border);border-radius:8px;color:var(--text);font-family:'DM Sans',sans-serif;font-size:.85rem;cursor:pointer;white-space:nowrap;transition:border-color .2s" onmouseover="this.style.borderColor='var(--accent)'" onmouseout="this.style.borderColor='var(--border)'">
+        ⬇ Lataa CSV
+      </button>
     </div>
 
     <h3 style="font-size:.8rem;text-transform:uppercase;letter-spacing:1px;color:var(--muted);margin-bottom:8px" id="p1label">Pelaajat <span id="filterBadge" style="display:none;background:var(--accent);color:#0d0f14;border-radius:4px;padding:2px 8px;font-size:.7rem;margin-left:8px;cursor:pointer" onclick="clearFilter()">✕ Tyhjennä suodatin</span></h3>
@@ -296,8 +302,9 @@ function processSeason(s){
 function initApp(){
   seasons = [...new Set(allRows.map(r=>r[COL.kausi]).filter(Boolean))].sort().reverse();
   const sel = document.getElementById('seasonSel');
-  seasons.forEach(s => { const o=document.createElement('option'); o.value=s; o.textContent=s; sel.appendChild(o); });
+  seasons.forEach(s => { const o=document.createElement('option'); o.value=s; o.textContent=s; document.getElementById('seasonSel').appendChild(o); });
   curSeason = seasons[0];
+  selectedSeasons = new Set([curSeason]);
   processSeason(curSeason);
   r1=players[0]; r2=players[1];
   tlSel = new Set(players.slice(0,3));
@@ -313,6 +320,7 @@ function initApp(){
 
 function changeSeason(){
   curSeason = document.getElementById('seasonSel').value;
+  selectedSeasons = new Set([curSeason]);
   processSeason(curSeason);
   r1=players[0]; r2=players[1]; tlSel=new Set(players.slice(0,3));
   activePlayer=null; activeOpp=null;
@@ -484,7 +492,80 @@ function buildSG(){
   });
 }
 
-// ── TILASTOTAULUKKO ───────────────────────────────────────
+// ── TILASTOSIVUN KAUSIVALINTA ─────────────────────────────
+let selectedSeasons = new Set(); // tyhjä = kaikki kaudet
+
+
+
+function getTblRows(){
+  const seas = selectedSeasons.size>0 ? [...selectedSeasons] : [curSeason];
+  return allRows.filter(r => seas.includes(r[COL.kausi]) && r[COL.sarja]==='Sarja');
+}
+
+function downloadCSV(){
+  const seas = [...selectedSeasons].sort();
+  const rows = allRows.filter(r => seas.includes(r[COL.kausi]) && r[COL.sarja]==='Sarja');
+
+  const dateStr = new Date().toLocaleDateString('fi-FI');
+
+  const meta = [
+    `# PP Stats - Game-by-Game Player Statistics Export`,
+    `# Team: PP`,
+    `# Season(s): ${seas.join(', ')}`,
+    `# Exported: ${dateStr}`,
+    `# Each row = one player's stats in one game. Regular season only.`,
+    `# IMPORTANT: Only some games have advanced stats (shots, rebounds, assists etc). Player points (PTS) are recorded for all games.`,
+    `# The column "Advanced_Stats" indicates whether advanced stats were recorded for that player in that game (1=yes, 0=no).`,
+    `# When Advanced_Stats=0, all stat columns except PTS, Team_Score and Opp_Score will be empty.`,
+    `# Columns: Player, Game number, Opponent, Home/Away, Result, Season, Our score, Opponent score, Date, Minutes played, Advanced_Stats, Points, FGM/FGA/FG_pct=field goals, 2PM/2PA/2P_pct=two-pointers, 3PM/3PA/3P_pct=three-pointers, FTM/FTA/FT_pct=free throws, ORB=offensive rebounds, DRB=defensive rebounds, REB=total rebounds, AST=assists, STL=steals, BLK=blocks, TOV=turnovers, PF=personal fouls`,
+    ``
+  ].join('\n');
+
+  const headers = [
+    'Player','Game','Opponent','Home_Away','Result','Season',
+    'Team_Score','Opp_Score','Date','Minutes','Advanced_Stats',
+    'PTS','FGM','FGA','FG_pct','2PM','2PA','2P_pct',
+    '3PM','3PA','3P_pct','FTM','FTA','FT_pct',
+    'ORB','DRB','REB','AST','STL','BLK','TOV','PF'
+  ];
+
+  const pct=(a,b)=>b>0?+(a/b*100).toFixed(1):'';
+  const csvRows = rows.map(r=>{
+    const fgm=n(r[COL.fgm]), fga=n(r[COL.fga]);
+    const t3m=n(r[COL.t3m]), t3a=n(r[COL.t3a]);
+    const ftm=n(r[COL.ftm]), fta=n(r[COL.fta]);
+    const hasAdv = fga>0||t3a>0||fta>0||n(r[COL.rb])>0||n(r[COL.ast])>0||n(r[COL.stl])>0||n(r[COL.blk])>0||n(r[COL.to])>0||n(r[COL.pf])>0;
+    const mins = parseMinutes(r['Pl. Time']);
+    const vals = [
+      r[COL.nimi]||'',
+      r[COL.ottelu]||'',
+      r[COL.vastustaja]||'',
+      r['Koti/Vieras']||'',
+      r[COL.tulos]||'',
+      r[COL.kausi]||'',
+      n(r[COL.omaPts])||'',
+      n(r[COL.vastPts])||'',
+      r['Pvm']||'',
+      mins!=null?mins:'',
+      hasAdv?1:0,
+      n(r[COL.pisteet])||'',
+      hasAdv?fgm:'', hasAdv?fga:'', hasAdv?pct(fgm,fga):'',
+      hasAdv?(fgm-t3m):'', hasAdv?(fga-t3a):'', hasAdv?pct(fgm-t3m,fga-t3a):'',
+      hasAdv?t3m:'', hasAdv?t3a:'', hasAdv?pct(t3m,t3a):'',
+      hasAdv?ftm:'', hasAdv?fta:'', hasAdv?pct(ftm,fta):'',
+      hasAdv?n(r[COL.orb]):'', hasAdv?n(r[COL.drb]):'', hasAdv?n(r[COL.rb]):'',
+      hasAdv?n(r[COL.ast]):'', hasAdv?n(r[COL.stl]):'', hasAdv?n(r[COL.blk]):'',
+      hasAdv?n(r[COL.to]):'', hasAdv?n(r[COL.pf]):''
+    ];
+    return vals.map(v=>{ const s=String(v); return s.includes(',')?`"${s}"`:s; }).join(',');
+  });
+
+  const blob = new Blob([meta + [headers.join(','),...csvRows].join('\n')], {type:'text/csv;charset=utf-8;'});
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href=url; a.download=`PP_Stats_${seas.join('_')}_${dateStr.replace(/\./g,'-')}.csv`;
+  a.click(); URL.revokeObjectURL(url);
+}
 let tblMode='yht';       // 'yht' | 'ppeli'
 let activePlayer=null;   // valittu pelaaja
 let activeOpp=null;      // valittu vastustaja
@@ -698,7 +779,7 @@ function getFilteredRows(){
 }
 
 function renderBothTables(){
-  const baseRows=allRows.filter(r=>r[COL.kausi]===curSeason&&r[COL.sarja]==='Sarja');
+  const baseRows = getTblRows();
 
   // activeOpp on muotoa "12__Vastustajan nimi" tai null
   const activeOppName = activeOpp ? activeOpp.split('__').slice(1).join('__') : null;
