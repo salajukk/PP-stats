@@ -24,8 +24,9 @@ Data haetaan `js/data.js`-tiedostossa määritellystä Google Apps Script -endpo
 
 - CSS ja JavaScript erotettu monoliittisesta `index.html`-tiedostosta.
 - CSV-export säilyttää aidot nolla-arvot (esim. 0 pistettä) tyhjän solun sijaan.
-- Minuuttien parsinnasta poistettu kiinteä Helsinki UTC+2 -lisäys; Sheetsin aika-arvo käsitellään kestona, ei aikavyöhykkeen kellonaikana.
+- Apps Scriptin ISO-muotoon serialisoima peliaika muunnetaan takaisin minuuteiksi ja 24 tunnin ylitys kierretään oikein.
 - Advanced stats -tunnistus perustuu kenttien olemassaoloon, joten täysin nollatilastoitu peli voidaan erottaa puuttuvasta tilastodatasta.
+- Refaktoroinnin katselmuksessa varmistettiin, että pistekehityksen joukkuekeskiarvo, TOTAL-rivit, lajittelu, korostukset ja täysi CSV-sarakemääritys säilyvät.
 
 ## Kehitys
 
