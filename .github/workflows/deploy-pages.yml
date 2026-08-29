@@ -1,0 +1,67 @@
+name: Deploy production and preview to GitHub Pages
+
+on:
+  push:
+    branches:
+      - main
+      - preview
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+concurrency:
+  group: pages
+  cancel-in-progress: false
+
+jobs:
+  deploy:
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout production (main)
+        uses: actions/checkout@v4
+        with:
+          ref: main
+          path: production
+
+      - name: Checkout preview
+        uses: actions/checkout@v4
+        with:
+          ref: preview
+          path: preview-source
+
+      - name: Build Pages site
+        run: |
+          mkdir -p site
+          rsync -a --delete \
+            --exclude '.git/' \
+            --exclude '.github/' \
+            --exclude 'README.md' \
+            production/ site/
+
+          mkdir -p site/preview
+          rsync -a --delete \
+            --exclude '.git/' \
+            --exclude '.github/' \
+            --exclude 'README.md' \
+            preview-source/ site/preview/
+
+          touch site/.nojekyll
+
+      - name: Configure GitHub Pages
+        uses: actions/configure-pages@v5
+
+      - name: Upload Pages artifact
+        uses: actions/upload-pages-artifact@v3
+        with:
+          path: site
+
+      - name: Deploy to GitHub Pages
+        id: deployment
+        uses: actions/deploy-pages@v4
