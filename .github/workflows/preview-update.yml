@@ -1,0 +1,16 @@
+name: Preview update signal
+
+on:
+  push:
+    branches:
+      - preview
+
+permissions:
+  contents: read
+
+jobs:
+  signal:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Signal preview update
+        run: echo "Preview branch updated"
