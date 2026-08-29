@@ -1,3 +1,4 @@
+function esc(v){return String(v??'').replace(/[&<>'\x22]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;',"'":'&#39;','\x22':'&quot;'}[c]))}
 function showError(msg){document.getElementById('loading').style.display='none';const el=document.getElementById('error-msg');el.style.display='block';el.querySelector('.tech').textContent=msg}
 function updateRecord(){const w=tGames.filter(g=>g[COL.tulos]==='Voitto').length,l=tGames.filter(g=>g[COL.tulos]==='Tappio').length;document.getElementById('record').textContent=`${w}–${l}`}
 function showTab(id,btn){document.querySelectorAll('.section').forEach(s=>s.classList.remove('active'));document.querySelectorAll('.tab').forEach(t=>t.classList.remove('active'));document.getElementById(id).classList.add('active');btn.classList.add('active');document.getElementById('seasonSel').classList.toggle('history-hidden',id==='playerHistory'||id==='teamHistory');if(id==='playerHistory')renderPlayerHistory();if(id==='teamHistory')renderTeamHistory()}
