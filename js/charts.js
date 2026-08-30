@@ -20,8 +20,20 @@ function buildRadarChips(){
 
 function buildRadar(){
   if(!r1||!r2) return;
+  const canvas=document.getElementById('radarC');
+  const note=document.getElementById('radarNote');
+  const missing=[r1,r2].filter(p=>!pStats[p]?.hasAdv);
+  if(missing.length){
+    rChart?.destroy(); rChart=null;
+    canvas.style.display='none';
+    note.style.display='block';
+    note.textContent=`Pelaajaprofiili vaatii lisätilastot. Ei lisätilastoja: ${missing.join(', ')}.`;
+    return;
+  }
+  canvas.style.display='block';
+  note.style.display='none';
   rChart?.destroy();
-  rChart=new Chart(document.getElementById('radarC'),{
+  rChart=new Chart(canvas,{
     type:'radar',
     data:{labels:RL,datasets:[
       {label:r1,data:RK.map(k=>norm(k,pStats[r1]?.[k]||0)),borderColor:'#f0a500',backgroundColor:'rgba(240,165,0,.15)',pointBackgroundColor:'#f0a500',borderWidth:2},
@@ -104,6 +116,6 @@ function buildShooting(){
   if(!adv.length){ el.innerHTML='<p style="color:var(--muted);padding:20px">Ei edistyneitä tilastoja tällä kaudella.</p>'; return; }
   adv.sort((a,b)=>pStats[b].FGp-pStats[a].FGp).forEach(p=>{
     const d=pStats[p];
-    el.insertAdjacentHTML('beforeend',`<div class="sc"><div class="sc-name">${p}</div><div style="display:flex;gap:12px;margin-bottom:14px"><div><div class="big">${d.PPG}</div><div class="biglbl">PPG</div></div><div style="margin-left:auto;text-align:right"><div class="biglbl">${d.Pelit} peliä</div><div class="biglbl">EFF ${d.EFF}</div></div></div><div class="bl"><span>FG%</span><span>${d.FGp}%</span></div><div class="bt"><div class="bf bfg" style="width:${d.FGp}%"></div></div><div class="bl"><span>3PT%</span><span>${d.P3p}%</span></div><div class="bt"><div class="bf b3p" style="width:${d.P3p}%"></div></div><div class="bl"><span>3PA/peli</span><span>${d.P3a}</span></div></div>`);
+    el.insertAdjacentHTML('beforeend',`<div class="sc"><div class="sc-name">${escapeHtml(p)}</div><div style="display:flex;gap:12px;margin-bottom:14px"><div><div class="big">${d.PPG}</div><div class="biglbl">PPG</div></div><div style="margin-left:auto;text-align:right"><div class="biglbl">${d.AdvPelit} lisätilastopeliä / ${d.Pelit} peliä</div><div class="biglbl">EFF ${d.EFF}</div></div></div><div class="bl"><span>FG%</span><span>${d.FGp}%</span></div><div class="bt"><div class="bf bfg" style="width:${d.FGp}%"></div></div><div class="bl"><span>3PT%</span><span>${d.P3p}%</span></div><div class="bt"><div class="bf b3p" style="width:${d.P3p}%"></div></div><div class="bl"><span>3PA/peli</span><span>${d.P3a}</span></div></div>`);
   });
 }
