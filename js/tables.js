@@ -83,6 +83,14 @@ function makeTotalRow(data,cols){
   return total;
 }
 
+function addTableCell(row,value,className=''){
+  const td=document.createElement('td');
+  td.textContent=value??'-';
+  if(className) td.className=className;
+  row.appendChild(td);
+  return td;
+}
+
 function renderTable(data,tbodyId,cols,isOpp=false){
   const key=isOpp?sKeyO:sKeyP, desc=isOpp?sDescO:sDescP;
   data.sort((a,b)=>{
@@ -94,21 +102,61 @@ function renderTable(data,tbodyId,cols,isOpp=false){
   const max={};
   cols.forEach(c=>{ max[c]=Math.max(0,...data.map(r=>r[c]==='-'?0:Number(r[c])||0)); });
   const total=makeTotalRow(data,cols);
-  const totalHtml=`<tr class="total-row"><td>TOTAL</td>${!isOpp?`<td>${total.gp}</td>`:''}${cols.map(c=>`<td>${total[c]??'-'}</td>`).join('')}</tr>`;
+  const tbody=document.getElementById(tbodyId);
+  tbody.replaceChildren();
 
-  const rowsHtml=data.map(r=>{
+  const totalRow=document.createElement('tr');
+  totalRow.className='total-row';
+  addTableCell(totalRow,'TOTAL');
+  if(!isOpp) addTableCell(totalRow,total.gp);
+  cols.forEach(c=>addTableCell(totalRow,total[c]??'-'));
+  tbody.appendChild(totalRow);
+
+  data.forEach(r=>{
     const rowKey=isOpp?`${r.gameNum}__${r.label}`:r.label;
     const active=isOpp?activeOpp===rowKey:activePlayer===r.label;
-    const click=isOpp?`clickOpp('${String(rowKey).replace(/\\/g,'\\\\').replace(/'/g,"\\'")}')`:`clickPlayer('${String(r.label).replace(/\\/g,'\\\\').replace(/'/g,"\\'")}')`;
-    return `<tr onclick="${click}" style="cursor:pointer;${active?'background:rgba(240,165,0,.12);outline:1px solid var(--accent);':''}"><td style="white-space:nowrap">${r.displayLabel}</td>${!isOpp?`<td>${r.gp}</td>`:''}${cols.map(c=>`<td class="${r[c]!=='-'&&Number(r[c])===max[c]&&max[c]>0?'hl':''}">${r[c]}</td>`).join('')}</tr>`;
-  }).join('');
-  document.getElementById(tbodyId).innerHTML=totalHtml+rowsHtml;
+    const tr=document.createElement('tr');
+    tr.style.cursor='pointer';
+    if(active){
+      tr.style.background='rgba(240,165,0,.12)';
+      tr.style.outline='1px solid var(--accent)';
+    }
+    tr.addEventListener('click',()=>isOpp?clickOpp(rowKey):clickPlayer(r.label));
+
+    const labelCell=addTableCell(tr,r.displayLabel);
+    labelCell.style.whiteSpace='nowrap';
+    if(!isOpp) addTableCell(tr,r.gp);
+    cols.forEach(c=>{
+      const highlight=r[c]!=='-' && Number(r[c])===max[c] && max[c]>0;
+      addTableCell(tr,r[c],highlight?'hl':'');
+    });
+    tbody.appendChild(tr);
+  });
 
   const tableId=isOpp?'oppTable':'playerTable';
   document.querySelectorAll(`#${tableId} th`).forEach(t=>t.classList.remove('sa','sd'));
   const keys=isOpp?['label',...cols]:['label','gp',...cols];
   const idx=keys.indexOf(key), ths=document.querySelectorAll(`#${tableId} th`);
   if(idx>=0&&ths[idx]) ths[idx].classList.add(desc?'sd':'sa');
+}
+
+function setTableHeading(id,label,detail='',showClear=false){
+  const el=document.getElementById(id);
+  el.replaceChildren(document.createTextNode(label));
+  if(detail){
+    el.appendChild(document.createTextNode(' '));
+    const small=document.createElement('small');
+    small.style.color='var(--accent)';
+    small.textContent=`— ${detail}`;
+    el.appendChild(small);
+  }
+  if(showClear){
+    const badge=document.createElement('span');
+    badge.className='filter-badge';
+    badge.textContent='✕ Tyhjennä suodatin';
+    badge.addEventListener('click',clearFilter);
+    el.appendChild(badge);
+  }
 }
 
 function renderBothTables(){
@@ -120,13 +168,13 @@ function renderBothTables(){
   renderTable(aggregateRows(pRows,COL.nimi),'tbP',PLAYER_COLS,false);
   renderTable(aggregateRows(oRows,COL.vastustaja),'tbO',OPP_COLS,true);
 
-  document.getElementById('p1label').innerHTML=`Pelaajat ${oppName?`<small style="color:var(--accent)">— ${oppName}</small>`:''}<span class="filter-badge" style="display:${activePlayer||activeOpp?'inline':'none'}" onclick="clearFilter()">✕ Tyhjennä suodatin</span>`;
-  document.getElementById('p2label').innerHTML=`Vastustajat ${activePlayer?`<small style="color:var(--accent)">— ${activePlayer}</small>`:''}`;
+  setTableHeading('p1label','Pelaajat',oppName||'',Boolean(activePlayer||activeOpp));
+  setTableHeading('p2label','Vastustajat',activePlayer||'',false);
 }
 
 function clickPlayer(name){ activePlayer=activePlayer===name?null:name; activeOpp=null; renderBothTables(); }
 function clickOpp(key){ activeOpp=activeOpp===key?null:key; activePlayer=null; renderBothTables(); }
-function clearFilter(){ activePlayer=null; activeOpp=null; renderBothTables(); }
+function clearFilter(event){ event?.stopPropagation(); activePlayer=null; activeOpp=null; renderBothTables(); }
 function srtP(k){ if(sKeyP===k) sDescP=!sDescP; else{sKeyP=k;sDescP=true;} renderBothTables(); }
 function srtO(k){ if(sKeyO===k) sDescO=!sDescO; else{sKeyO=k;sDescO=false;} renderBothTables(); }
 
