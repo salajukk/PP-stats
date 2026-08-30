@@ -24,7 +24,7 @@
 <button class="tab" onclick="showTab('teamHistory',this)">📚 Joukkuehistoria</button>
 <select class="season-select" id="seasonSel" onchange="changeSeason()"></select>
 </nav>
-<section id="radar" class="section active"><h2>Pelaajaprofiilit</h2><p class="sdesc">Vertaile kahta pelaajaa seitsemällä osa-alueella.</p><div class="chip-label">Pelaaja 1</div><div class="chip-row" id="c1"></div><div class="chip-label">Pelaaja 2</div><div class="chip-row" id="c2"></div><div class="radar-wrap"><div class="cbox"><canvas id="radarC"></canvas></div></div></section>
+<section id="radar" class="section active"><h2>Pelaajaprofiilit</h2><p class="sdesc">Vertaile kahta pelaajaa seitsemällä osa-alueella.</p><div class="chip-label">Pelaaja 1</div><div class="chip-row" id="c1"></div><div class="chip-label">Pelaaja 2</div><div class="chip-row" id="c2"></div><div class="radar-wrap"><div class="cbox"><p id="radarNote" class="sdesc" style="display:none;margin-bottom:0"></p><canvas id="radarC"></canvas></div></div></section>
 <section id="timeline" class="section"><h2>Pistekehitys ottelusta toiseen</h2><p class="sdesc">Valitse pelaajat.</p><div class="toolbar"><div class="chip-row" id="tlChips"></div><div class="toggle"><button id="btnPeli" class="active" onclick="setTlMode('peli')">Per peli</button><button id="btnKumu" onclick="setTlMode('kumu')">Kumulatiivinen</button></div></div><span class="mobile-hint">👆 Voit vierittää kaaviota sivusuunnassa</span><div class="mobile-scroll"><div class="cbox"><canvas id="tlC" height="180"></canvas></div></div></section>
 <section id="team" class="section"><h2>Joukkueen tulokset</h2><p class="sdesc">Vihreä = voitto, oranssi = tappio.</p><span class="mobile-hint">👆 Voit vierittää kaaviota sivusuunnassa</span><div class="mobile-scroll"><div class="cbox team-wrap"><canvas id="teamC" height="180"></canvas></div></div><p class="upd" id="upd"></p></section>
 <section id="shooting" class="section"><h2>Heittotehokkuus</h2><p class="sdesc">FG% ja 3PT% per pelaaja.</p><div class="sg" id="sg"></div></section>
@@ -56,5 +56,5 @@
 </div>
 </section>
 </div>
-<script src="js/data.js"></script><script src="js/charts.js"></script><script src="js/tables.js"></script><script src="js/history.js"></script><script src="js/app.js"></script>
+<script src="js/utils.js"></script><script src="js/data.js"></script><script src="js/charts.js"></script><script src="js/tables.js"></script><script src="js/history.js"></script><script src="js/app.js"></script>
 </body></html>
