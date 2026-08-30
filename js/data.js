@@ -43,6 +43,7 @@ async function loadData(){
   const res=await fetch(APPS_SCRIPT_URL);
   if(!res.ok) throw new Error('HTTP '+res.status);
   allRows=await res.json();
+  if(!Array.isArray(allRows)) throw new Error('Rajapinta ei palauttanut taulukkomuotoista dataa.');
   seasons=[...new Set(allRows.map(r=>r[COL.kausi]).filter(Boolean))].sort().reverse();
   curSeason=seasons[0]||'';
   processSeason(curSeason);
@@ -60,24 +61,45 @@ function processSeason(s){
   const pm={};
   rows.forEach(r=>{
     const nm=r[COL.nimi]; if(!nm) return;
-    if(!pm[nm]) pm[nm]={games:new Set(),pts:0,fgm:0,fga:0,t3m:0,t3a:0,ftm:0,fta:0,rb:0,ast:0,stl:0,blk:0,to:0,adv:false};
+    if(!pm[nm]) pm[nm]={
+      games:new Set(), pts:0,
+      advGames:new Set(), advPts:0, fgm:0,fga:0,t3m:0,t3a:0,ftm:0,fta:0,
+      rb:0,ast:0,stl:0,blk:0,to:0
+    };
     const p=pm[nm];
-    p.games.add(r[COL.ottelu]); p.pts+=n(r[COL.pisteet]);
-    p.fgm+=n(r[COL.fgm]); p.fga+=n(r[COL.fga]); p.t3m+=n(r[COL.t3m]); p.t3a+=n(r[COL.t3a]);
-    p.ftm+=n(r[COL.ftm]); p.fta+=n(r[COL.fta]); p.rb+=n(r[COL.rb]); p.ast+=n(r[COL.ast]);
-    p.stl+=n(r[COL.stl]); p.blk+=n(r[COL.blk]); p.to+=n(r[COL.to]);
-    p.adv = p.adv || hasAdvancedStats(r);
+    p.games.add(r[COL.ottelu]);
+    p.pts+=n(r[COL.pisteet]);
+
+    if(hasAdvancedStats(r)){
+      p.advGames.add(r[COL.ottelu]);
+      p.advPts+=n(r[COL.pisteet]);
+      p.fgm+=n(r[COL.fgm]); p.fga+=n(r[COL.fga]); p.t3m+=n(r[COL.t3m]); p.t3a+=n(r[COL.t3a]);
+      p.ftm+=n(r[COL.ftm]); p.fta+=n(r[COL.fta]); p.rb+=n(r[COL.rb]); p.ast+=n(r[COL.ast]);
+      p.stl+=n(r[COL.stl]); p.blk+=n(r[COL.blk]); p.to+=n(r[COL.to]);
+    }
   });
 
   pStats={};
   for(const [nm,p] of Object.entries(pm)){
-    const g=p.games.size||1;
-    const eff=p.pts+p.rb+p.ast+p.stl+p.blk-p.to-(p.fga-p.fgm)-(p.fta-p.ftm);
+    const gamesAll=p.games.size||1;
+    const advGames=p.advGames.size;
+    const eff=advGames
+      ? p.advPts+p.rb+p.ast+p.stl+p.blk-p.to-(p.fga-p.fgm)-(p.fta-p.ftm)
+      : 0;
     pStats[nm]={
-      Pelit:p.games.size, PPG:+(p.pts/g).toFixed(1), RPG:+(p.rb/g).toFixed(1), APG:+(p.ast/g).toFixed(1),
-      SPG:+(p.stl/g).toFixed(1), BPG:+(p.blk/g).toFixed(1), FGp:p.fga?+(p.fgm/p.fga*100).toFixed(1):0,
-      P3p:p.t3a?+(p.t3m/p.t3a*100).toFixed(1):0, P3a:+(p.t3a/g).toFixed(1),
-      AT:p.to?+(p.ast/p.to).toFixed(2):0, EFF:+(eff/g).toFixed(1), hasAdv:p.adv
+      Pelit:p.games.size,
+      AdvPelit:advGames,
+      PPG:+(p.pts/gamesAll).toFixed(1),
+      RPG:advGames?+(p.rb/advGames).toFixed(1):null,
+      APG:advGames?+(p.ast/advGames).toFixed(1):null,
+      SPG:advGames?+(p.stl/advGames).toFixed(1):null,
+      BPG:advGames?+(p.blk/advGames).toFixed(1):null,
+      FGp:advGames?(p.fga?+(p.fgm/p.fga*100).toFixed(1):0):null,
+      P3p:advGames?(p.t3a?+(p.t3m/p.t3a*100).toFixed(1):0):null,
+      P3a:advGames?+(p.t3a/advGames).toFixed(1):null,
+      AT:advGames?(p.to?+(p.ast/p.to).toFixed(2):0):null,
+      EFF:advGames?+(eff/advGames).toFixed(1):null,
+      hasAdv:advGames>0
     };
   }
 
