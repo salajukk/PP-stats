@@ -61,6 +61,8 @@ GitHub Actions ajaa samat tarkistukset pull requesteille ja ennen Pages-julkaisu
 - `preview` = testiversio: `https://salajukk.github.io/PP-stats/preview/`
 - suuret muutokset tehdään lyhytikäisissä `feature/...` tai `chore/...` brancheissa
 
+`main` on suojattu GitHub Rulesetillä. Muutokset viedään `mainiin` Pull Requestin kautta, `test`-status checkin täytyy onnistua ja merge tehdään Squash-menetelmällä. Force push ja `main`-branchin poistaminen on estetty.
+
 Tyypillinen prosessi:
 
 ```text
