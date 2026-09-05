@@ -2,7 +2,7 @@ const APPS_SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbyyDbxGfzz3nuDH
 const PAL = ['#f0a500','#5b8dee','#3ecf8e','#e05a2b','#c084fc','#f472b6','#34d399','#fb923c','#60a5fa','#a78bfa','#fbbf24','#4ade80'];
 const COL = {
   nimi:'Nimi', ottelu:'Ottelunumero', vastustaja:'Vastustaja', pisteet:'Pisteet',
-  kotiv:'Koti/Vieras', tulos:'Lopputulos', kausi:'Kausi', sarja:'Sarja/Harjoitus',
+  kotiv:'Koti/Vieras', tulos:'Lopputulos', kausi:'Kausi', sarja:'Sarja/Harjoitus', pvm:'Pvm',
   omaPts:'Omat pisteet', vastPts:'Vastustajan pisteet', fgm:'FGM', fga:'FGA',
   t3m:'3PTM', t3a:'3PTA', ftm:'FTM', fta:'FTA', orb:'ORB', drb:'DRB', rb:'RB',
   ast:'AST', stl:'STL', blk:'BLK', to:'TO', pf:'PF'
