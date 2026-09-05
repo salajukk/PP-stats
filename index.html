@@ -34,7 +34,11 @@
 
 <section id="playerHistory" class="section">
 <h2>Pelaajahistoria</h2><p class="sdesc">Kaikkien kausien vertailukelpoiset perustilastot. Lisätilastoja ei käytetä tässä näkymässä.</p>
-<div class="history-toolbar"><label class="chip-label" for="historyPlayerSel" style="margin-bottom:0">Pelaaja</label><select id="historyPlayerSel" class="history-select"></select></div>
+<div class="history-toolbar">
+  <div class="history-filter"><label class="chip-label" for="historyPlayerSel">Pelaaja</label><select id="historyPlayerSel" class="history-select"></select></div>
+  <div class="history-filter"><label class="chip-label" for="playerHistoryHalfSel">Kausipuolisko</label><select id="playerHistoryHalfSel" class="history-select"><option value="all">Kaikki</option><option value="spring">Kevät</option><option value="autumn">Syksy</option></select></div>
+  <div class="history-filter"><label class="chip-label" for="playerHistoryResultSel">Tulos</label><select id="playerHistoryResultSel" class="history-select"><option value="all">Kaikki</option><option value="W">Voitot</option><option value="L">Tappiot</option></select></div>
+</div>
 <div id="playerHistoryContent"><div id="playerHistoryMetrics" class="history-metrics"></div>
 <div class="history-grid">
 <div class="history-panel"><h3>Kausitilastot</h3><div class="twrap"><table class="history-table"><thead><tr><th>Kausi</th><th>GP</th><th>PTS</th><th>PPG</th><th>High</th><th>W–L</th></tr></thead><tbody id="playerSeasonBody"></tbody></table></div></div>
@@ -47,9 +51,13 @@
 
 <section id="teamHistory" class="section">
 <h2>Joukkuehistoria</h2><p class="sdesc">Joukkueen kaikkien kausien tulokset, pistekehitys, vastustajahistoria ja ennätykset.</p>
+<div class="history-toolbar">
+  <div class="history-filter"><label class="chip-label" for="teamHistoryHalfSel">Kausipuolisko</label><select id="teamHistoryHalfSel" class="history-select"><option value="all">Kaikki</option><option value="spring">Kevät</option><option value="autumn">Syksy</option></select></div>
+  <div class="history-filter"><label class="chip-label" for="teamHistoryResultSel">Tulos</label><select id="teamHistoryResultSel" class="history-select"><option value="all">Kaikki</option><option value="W">Voitot</option><option value="L">Tappiot</option></select></div>
+</div>
 <div id="teamHistoryMetrics" class="history-metrics"></div>
 <div class="history-grid">
-<div class="history-panel"><h3>Kausivertailu</h3><div class="twrap"><table class="history-table"><thead><tr><th>Kausi</th><th>W–L</th><th>W%</th><th>PF/G</th><th>PA/G</th><th>+/-</th><th>High</th></tr></thead><tbody id="teamSeasonHistoryBody"></tbody></table></div></div>
+<div class="history-panel"><h3>Kausivertailu</h3><div class="twrap"><table class="history-table"><thead><tr><th>Kausi</th><th>W–L</th><th>W%</th><th title="Pelaajia per peli">PLR/G</th><th>PF/G</th><th>PA/G</th><th>+/-</th><th>High</th></tr></thead><tbody id="teamSeasonHistoryBody"></tbody></table></div></div>
 <div class="history-panel"><h3>Joukkueen kehitys</h3><div class="history-chart-scroll"><canvas id="teamSeasonHistoryC"></canvas></div></div>
 <div class="history-panel history-full"><h3>All-time ennätykset</h3><div id="teamHistoryRecords" class="history-metrics" style="margin-bottom:0"></div></div>
 <div class="history-panel history-full"><h3>Vastustajahistoria</h3><div class="twrap"><table class="history-table"><thead><tr><th>Vastustaja</th><th>GP</th><th>W–L</th><th>W%</th><th>PF/G</th><th>PA/G</th><th>+/-</th></tr></thead><tbody id="opponentHistoryBody"></tbody></table></div></div>

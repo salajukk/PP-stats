@@ -1,5 +1,7 @@
 let historyPlayer='';
 let playerSeasonChart=null, playerCareerChart=null, teamSeasonHistoryChart=null;
+let playerHistoryFilters={half:'all',result:'all'};
+let teamHistoryFilters={half:'all',result:'all'};
 
 function historyRows(){
   return allRows.filter(r=>r[COL.sarja]==='Sarja');
@@ -21,6 +23,47 @@ function resultCode(r){
   return '';
 }
 
+function historyMonth(v){
+  if(v==null || v==='') return null;
+
+  if(typeof v==='number' && Number.isFinite(v)){
+    const d=new Date(Math.round((v-25569)*86400*1000));
+    return Number.isNaN(d.getTime())?null:d.getUTCMonth()+1;
+  }
+
+  const s=String(v).trim();
+  if(!s) return null;
+
+  let m=s.match(/^(\d{4})-(\d{1,2})-(\d{1,2})/);
+  if(m){
+    const month=+m[2];
+    return month>=1&&month<=12?month:null;
+  }
+
+  m=s.match(/^(\d{1,2})[./-](\d{1,2})[./-](\d{4})$/);
+  if(m){
+    const month=+m[2];
+    return month>=1&&month<=12?month:null;
+  }
+
+  const d=new Date(s);
+  return Number.isNaN(d.getTime())?null:d.getMonth()+1;
+}
+
+function historyHalfFromDate(v){
+  const month=historyMonth(v);
+  if(month==null) return '';
+  return month<=6?'spring':'autumn';
+}
+
+function filterHistoryGames(games,filters){
+  const f=filters||{half:'all',result:'all'};
+  return games.filter(g=>
+    (f.half==='all'||g.half===f.half) &&
+    (f.result==='all'||g.result===f.result)
+  );
+}
+
 function pct(w,total){ return total?+(w/total*100).toFixed(1):0; }
 function one(v){ return Number.isFinite(v)?(+v).toFixed(1):'–'; }
 
@@ -32,14 +75,21 @@ function playerHistoryGames(name){
   const map=new Map();
   historyRows().forEach(r=>{
     if(r[COL.nimi]!==name) return;
-    const season=r[COL.kausi]||'–', game=n(r[COL.ottelu]);
+    const season=r[COL.kausi]||'–', game=n(r[COL.ottelu]), date=r[COL.pvm]??'';
     const key=`${season}__${game}`;
-    if(!map.has(key)) map.set(key,{season,game,opp:r[COL.vastustaja]||'–',homeAway:r[COL.kotiv]||'',result:resultCode(r),pts:0});
+    if(!map.has(key)) map.set(key,{
+      season,game,opp:r[COL.vastustaja]||'–',homeAway:r[COL.kotiv]||'',
+      result:resultCode(r),pts:0,date,half:historyHalfFromDate(date)
+    });
     const g=map.get(key);
     g.pts+=n(r[COL.pisteet]);
     if(g.opp==='–' && r[COL.vastustaja]) g.opp=r[COL.vastustaja];
     if(!g.homeAway && r[COL.kotiv]) g.homeAway=r[COL.kotiv];
     if(!g.result) g.result=resultCode(r);
+    if(!g.date && r[COL.pvm]){
+      g.date=r[COL.pvm];
+      g.half=historyHalfFromDate(g.date);
+    }
   });
   return [...map.values()].sort((a,b)=>seasonCmp(a.season,b.season)||a.game-b.game);
 }
@@ -55,29 +105,70 @@ function playerSeasonRows(games){
   return [...map.values()].sort((a,b)=>seasonCmp(a.season,b.season)).map(s=>({...s,ppg:s.gp?s.pts/s.gp:0}));
 }
 
-function playerLeaderboard(){
+function playerLeaderboard(filters=playerHistoryFilters){
   return allHistoryPlayers().map(name=>{
-    const games=playerHistoryGames(name), ss=new Set(games.map(g=>g.season));
+    const games=filterHistoryGames(playerHistoryGames(name),filters), ss=new Set(games.map(g=>g.season));
     const pts=games.reduce((a,g)=>a+g.pts,0), high=games.reduce((a,g)=>Math.max(a,g.pts),0);
     return {name,seasons:ss.size,gp:games.length,pts,ppg:games.length?pts/games.length:0,high};
-  }).sort((a,b)=>b.pts-a.pts||b.ppg-a.ppg||a.name.localeCompare(b.name,'fi'));
+  }).filter(p=>p.gp>0)
+    .sort((a,b)=>b.pts-a.pts||b.ppg-a.ppg||a.name.localeCompare(b.name,'fi'));
 }
 
 function metricCard(value,label,detail=''){
   return `<div class="history-metric"><div class="history-value">${escapeHtml(value)}</div><div class="history-label">${escapeHtml(label)}</div>${detail?`<div class="history-detail">${escapeHtml(detail)}</div>`:''}</div>`;
 }
 
+function bindHistoryFilters(prefix,filters,rerender){
+  const half=document.getElementById(`${prefix}HalfSel`);
+  const result=document.getElementById(`${prefix}ResultSel`);
+  if(half){
+    half.value=filters.half;
+    half.onchange=()=>{filters.half=half.value;rerender();};
+  }
+  if(result){
+    result.value=filters.result;
+    result.onchange=()=>{filters.result=result.value;rerender();};
+  }
+}
+
+function clearPlayerHistoryCharts(){
+  if(playerSeasonChart){playerSeasonChart.destroy();playerSeasonChart=null;}
+  if(playerCareerChart){playerCareerChart.destroy();playerCareerChart=null;}
+}
+
 function renderPlayerHistory(){
   const sel=document.getElementById('historyPlayerSel');
   if(!sel) return;
   const names=allHistoryPlayers();
-  if(!names.length){ document.getElementById('playerHistoryContent').innerHTML='<div class="history-empty">Ei historiadataa.</div>'; return; }
+  if(!names.length){
+    document.getElementById('playerHistoryContent').innerHTML='<div class="history-empty">Ei historiadataa.</div>';
+    return;
+  }
   if(!historyPlayer || !names.includes(historyPlayer)) historyPlayer=names[0];
   sel.innerHTML=names.map(p=>`<option value="${escapeHtml(p)}"${p===historyPlayer?' selected':''}>${escapeHtml(p)}</option>`).join('');
   sel.onchange=()=>{historyPlayer=sel.value;renderPlayerHistory();};
+  bindHistoryFilters('playerHistory',playerHistoryFilters,renderPlayerHistory);
 
-  const games=playerHistoryGames(historyPlayer), seasonRows=playerSeasonRows(games);
-  const pts=games.reduce((a,g)=>a+g.pts,0), ppg=games.length?pts/games.length:0;
+  const games=filterHistoryGames(playerHistoryGames(historyPlayer),playerHistoryFilters);
+  const seasonRows=playerSeasonRows(games);
+  const leaders=playerLeaderboard(playerHistoryFilters);
+
+  document.getElementById('historyLeaderboard').innerHTML=leaders.map((p,i)=>`<tr data-player="${encodeURIComponent(p.name)}"><td>${i+1}. ${escapeHtml(p.name)}</td><td>${p.seasons}</td><td>${p.gp}</td><td class="hl">${p.pts}</td><td>${one(p.ppg)}</td><td>${p.high}</td></tr>`).join('');
+  document.querySelectorAll('#historyLeaderboard tr[data-player]').forEach(tr=>tr.addEventListener('click',()=>{
+    historyPlayer=decodeURIComponent(tr.dataset.player);
+    renderPlayerHistory();
+    sel.scrollIntoView({behavior:'smooth',block:'center'});
+  }));
+
+  if(!games.length){
+    document.getElementById('playerHistoryMetrics').innerHTML='<div class="history-empty">Ei otteluita valituilla suodattimilla.</div>';
+    document.getElementById('playerSeasonBody').innerHTML='';
+    document.getElementById('playerTopGamesBody').innerHTML='';
+    clearPlayerHistoryCharts();
+    return;
+  }
+
+  const pts=games.reduce((a,g)=>a+g.pts,0), ppg=pts/games.length;
   const high=games.reduce((a,g)=>Math.max(a,g.pts),0);
   const best=[...seasonRows].sort((a,b)=>b.ppg-a.ppg||b.gp-a.gp)[0];
   const wins=games.filter(g=>g.result==='W').length, losses=games.filter(g=>g.result==='L').length;
@@ -92,10 +183,6 @@ function renderPlayerHistory(){
 
   const top=[...games].sort((a,b)=>b.pts-a.pts||seasonCmp(b.season,a.season)||b.game-a.game).slice(0,10);
   document.getElementById('playerTopGamesBody').innerHTML=top.map((g,i)=>`<tr><td>${i+1}</td><td>${escapeHtml(g.season)}</td><td>#${g.game}</td><td>${escapeHtml(g.opp)}</td><td>${escapeHtml(g.homeAway||'–')}</td><td>${escapeHtml(g.result||'–')}</td><td class="hl">${g.pts}</td></tr>`).join('');
-
-  const leaders=playerLeaderboard();
-  document.getElementById('historyLeaderboard').innerHTML=leaders.map((p,i)=>`<tr data-player="${encodeURIComponent(p.name)}"><td>${i+1}. ${escapeHtml(p.name)}</td><td>${p.seasons}</td><td>${p.gp}</td><td class="hl">${p.pts}</td><td>${one(p.ppg)}</td><td>${p.high}</td></tr>`).join('');
-  document.querySelectorAll('#historyLeaderboard tr[data-player]').forEach(tr=>tr.addEventListener('click',()=>{historyPlayer=decodeURIComponent(tr.dataset.player);renderPlayerHistory();sel.scrollIntoView({behavior:'smooth',block:'center'});}));
 
   if(playerSeasonChart) playerSeasonChart.destroy();
   playerSeasonChart=new Chart(document.getElementById('playerSeasonHistoryC'),{
@@ -119,26 +206,39 @@ function teamHistoryGames(){
   const map=new Map();
   historyRows().forEach(r=>{
     const season=r[COL.kausi]||'–', game=n(r[COL.ottelu]), key=`${season}__${game}`;
-    const own=numberOrNull(r[COL.omaPts]), oppPts=numberOrNull(r[COL.vastPts]);
-    if(!map.has(key)) map.set(key,{season,game,opp:r[COL.vastustaja]||'–',homeAway:r[COL.kotiv]||'',own,oppPts,result:resultCode(r)});
+    const own=numberOrNull(r[COL.omaPts]), oppPts=numberOrNull(r[COL.vastPts]), date=r[COL.pvm]??'';
+    if(!map.has(key)) map.set(key,{
+      season,game,opp:r[COL.vastustaja]||'–',homeAway:r[COL.kotiv]||'',own,oppPts,
+      result:resultCode(r),date,half:historyHalfFromDate(date),players:new Set()
+    });
     const g=map.get(key);
+    if(r[COL.nimi]) g.players.add(r[COL.nimi]);
     if(g.opp==='–' && r[COL.vastustaja]) g.opp=r[COL.vastustaja];
     if(!g.homeAway && r[COL.kotiv]) g.homeAway=r[COL.kotiv];
     if(!g.result) g.result=resultCode(r);
     if(g.own==null && own!=null) g.own=own;
     if(g.oppPts==null && oppPts!=null) g.oppPts=oppPts;
+    if(!g.date && r[COL.pvm]){
+      g.date=r[COL.pvm];
+      g.half=historyHalfFromDate(g.date);
+    }
   });
   return [...map.values()]
-    .map(g=>({...g,margin:g.own!=null&&g.oppPts!=null?g.own-g.oppPts:null}))
+    .map(g=>({
+      season:g.season,game:g.game,opp:g.opp,homeAway:g.homeAway,own:g.own,oppPts:g.oppPts,
+      result:g.result,date:g.date,half:g.half,playerCount:g.players.size,
+      margin:g.own!=null&&g.oppPts!=null?g.own-g.oppPts:null
+    }))
     .sort((a,b)=>seasonCmp(a.season,b.season)||a.game-b.game);
 }
 
 function teamSeasonRows(games){
   const map=new Map();
   games.forEach(g=>{
-    if(!map.has(g.season)) map.set(g.season,{season:g.season,gp:0,scoreGp:0,w:0,l:0,pf:0,pa:0,high:null});
+    if(!map.has(g.season)) map.set(g.season,{season:g.season,gp:0,scoreGp:0,w:0,l:0,pf:0,pa:0,high:null,playerTotal:0});
     const s=map.get(g.season);
     s.gp++;
+    s.playerTotal+=g.playerCount||0;
     if(g.result==='W') s.w++; else if(g.result==='L') s.l++;
     if(g.own!=null && g.oppPts!=null){
       s.scoreGp++;
@@ -150,6 +250,7 @@ function teamSeasonRows(games){
   return [...map.values()].sort((a,b)=>seasonCmp(a.season,b.season)).map(s=>({
     ...s,
     winPct:pct(s.w,s.w+s.l),
+    playersPerGame:s.gp?s.playerTotal/s.gp:null,
     pfpg:s.scoreGp?s.pf/s.scoreGp:null,
     papg:s.scoreGp?s.pa/s.scoreGp:null,
     diff:s.scoreGp?(s.pf-s.pa)/s.scoreGp:null
@@ -167,11 +268,25 @@ function diffText(v){
   return `${v>=0?'+':''}${one(v)}`;
 }
 
+function clearTeamHistory(){
+  document.getElementById('teamHistoryMetrics').innerHTML='<div class="history-empty">Ei otteluita valituilla suodattimilla.</div>';
+  document.getElementById('teamSeasonHistoryBody').innerHTML='';
+  document.getElementById('opponentHistoryBody').innerHTML='';
+  document.getElementById('teamHistoryRecords').innerHTML='';
+  if(teamSeasonHistoryChart){teamSeasonHistoryChart.destroy();teamSeasonHistoryChart=null;}
+}
+
 function renderTeamHistory(){
   const target=document.getElementById('teamHistoryMetrics');
   if(!target) return;
-  const games=teamHistoryGames(), seasonRows=teamSeasonRows(games);
-  if(!games.length){target.innerHTML='<div class="history-empty">Ei historiadataa.</div>';return;}
+  bindHistoryFilters('teamHistory',teamHistoryFilters,renderTeamHistory);
+
+  const allGames=teamHistoryGames();
+  const halfGames=filterHistoryGames(allGames,{half:teamHistoryFilters.half,result:'all'});
+  const games=filterHistoryGames(allGames,teamHistoryFilters);
+  const seasonRows=teamSeasonRows(games);
+  if(!games.length){clearTeamHistory();return;}
+
   const w=games.filter(g=>g.result==='W').length,l=games.filter(g=>g.result==='L').length;
   const scored=games.filter(g=>g.own!=null&&g.oppPts!=null);
   const pf=scored.reduce((a,g)=>a+g.own,0), pa=scored.reduce((a,g)=>a+g.oppPts,0);
@@ -185,7 +300,7 @@ function renderTeamHistory(){
 
   document.getElementById('teamSeasonHistoryBody').innerHTML=seasonRows.slice().reverse().map(s=>{
     const cls=Number.isFinite(s.diff)?(s.diff>0?'history-positive':s.diff<0?'history-negative':''):'';
-    return `<tr><td>${escapeHtml(s.season)}</td><td>${s.w}–${s.l}</td><td>${one(s.winPct)} %</td><td>${one(s.pfpg)}</td><td>${one(s.papg)}</td><td class="${cls}">${diffText(s.diff)}</td><td>${s.high??'–'}</td></tr>`;
+    return `<tr><td>${escapeHtml(s.season)}</td><td>${s.w}–${s.l}</td><td>${one(s.winPct)} %</td><td>${one(s.playersPerGame)}</td><td>${one(s.pfpg)}</td><td>${one(s.papg)}</td><td class="${cls}">${diffText(s.diff)}</td><td>${s.high??'–'}</td></tr>`;
   }).join('');
 
   const oppMap=new Map();
@@ -212,13 +327,15 @@ function renderTeamHistory(){
   const biggestLoss=[...games].filter(g=>g.margin!=null&&g.margin<0).sort((a,b)=>a.margin-b.margin)[0];
   const highScore=[...games].filter(g=>g.own!=null).sort((a,b)=>b.own-a.own)[0];
   const lowAllowed=[...games].filter(g=>g.oppPts!=null).sort((a,b)=>a.oppPts-b.oppPts)[0];
+  const winStreak=teamHistoryFilters.result==='L'?'–':longestStreak(halfGames,'W');
+  const lossStreak=teamHistoryFilters.result==='W'?'–':longestStreak(halfGames,'L');
   const recs=[
     {label:'Suurin voitto',value:biggestWin?`+${biggestWin.margin}`:'–',detail:biggestWin?`${biggestWin.season} #${biggestWin.game} vs ${biggestWin.opp} (${biggestWin.own}–${biggestWin.oppPts})`:''},
     {label:'Suurin tappio',value:biggestLoss?`${biggestLoss.margin}`:'–',detail:biggestLoss?`${biggestLoss.season} #${biggestLoss.game} vs ${biggestLoss.opp} (${biggestLoss.own}–${biggestLoss.oppPts})`:''},
     {label:'Eniten pisteitä',value:highScore?highScore.own:'–',detail:highScore?`${highScore.season} #${highScore.game} vs ${highScore.opp}`:''},
     {label:'Vähiten päästetty',value:lowAllowed?lowAllowed.oppPts:'–',detail:lowAllowed?`${lowAllowed.season} #${lowAllowed.game} vs ${lowAllowed.opp}`:''},
-    {label:'Pisin voittoputki',value:longestStreak(games,'W'),detail:'ottelua'},
-    {label:'Pisin tappioputki',value:longestStreak(games,'L'),detail:'ottelua'}
+    {label:'Pisin voittoputki',value:winStreak,detail:winStreak==='–'?'':'ottelua'},
+    {label:'Pisin tappioputki',value:lossStreak,detail:lossStreak==='–'?'':'ottelua'}
   ];
   document.getElementById('teamHistoryRecords').innerHTML=recs.map(r=>metricCard(r.value,r.label,r.detail)).join('');
 
