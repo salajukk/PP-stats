@@ -30,7 +30,8 @@ test('numberOrNull preserves genuine zero and rejects missing values',()=>{
 
 test('escapeHtml escapes untrusted text',()=>{
   const ctx=makeContext(['js/utils.js']);
-  const escaped=vm.runInContext(`escapeHtml('<img src=x onerror="boom">&\\'')`,ctx);
+  const input='<img src=x onerror="boom">&\'';
+  const escaped=vm.runInContext(`escapeHtml(${JSON.stringify(input)})`,ctx);
   assert.equal(escaped,'&lt;img src=x onerror=&quot;boom&quot;&gt;&amp;&#39;');
 });
 
@@ -116,9 +117,59 @@ test('team history preserves a genuine 0 score',()=>{
   assert.equal(game.margin,-10);
 });
 
+test('history dates classify spring and autumn across sheet and ISO formats',()=>{
+  const ctx=makeContext();
+  assert.equal(vm.runInContext(`historyHalfFromDate('15/02/2024')`,ctx),'spring');
+  assert.equal(vm.runInContext(`historyHalfFromDate('09/10/2016')`,ctx),'autumn');
+  assert.equal(vm.runInContext(`historyHalfFromDate('2025-03-12T00:00:00.000Z')`,ctx),'spring');
+  assert.equal(vm.runInContext(`historyHalfFromDate('2025-09-12T00:00:00.000Z')`,ctx),'autumn');
+  assert.equal(vm.runInContext(`historyHalfFromDate('')`,ctx),'');
+});
+
+test('history filters combine season half and result',()=>{
+  const ctx=makeContext();
+  const games=[
+    {half:'spring',result:'W'},
+    {half:'spring',result:'L'},
+    {half:'autumn',result:'W'}
+  ];
+  const count=vm.runInContext(`filterHistoryGames(${JSON.stringify(games)},{half:'spring',result:'W'}).length`,ctx);
+  assert.equal(count,1);
+  const autumn=vm.runInContext(`filterHistoryGames(${JSON.stringify(games)},{half:'autumn',result:'all'}).length`,ctx);
+  assert.equal(autumn,1);
+});
+
+test('team history calculates unique players per game and players per game by season',()=>{
+  const ctx=makeContext();
+  const rows=[
+    {'Nimi':'A','Ottelunumero':1,'Vastustaja':'X','Pisteet':5,'Kausi':'2024-25','Sarja/Harjoitus':'Sarja','Pvm':'10/10/2024','Lopputulos':'Voitto'},
+    {'Nimi':'B','Ottelunumero':1,'Vastustaja':'X','Pisteet':7,'Kausi':'2024-25','Sarja/Harjoitus':'Sarja','Pvm':'10/10/2024','Lopputulos':'Voitto'},
+    {'Nimi':'A','Ottelunumero':2,'Vastustaja':'Y','Pisteet':6,'Kausi':'2024-25','Sarja/Harjoitus':'Sarja','Pvm':'15/02/2025','Lopputulos':'Tappio'},
+    {'Nimi':'B','Ottelunumero':2,'Vastustaja':'Y','Pisteet':8,'Kausi':'2024-25','Sarja/Harjoitus':'Sarja','Pvm':'15/02/2025','Lopputulos':'Tappio'},
+    {'Nimi':'C','Ottelunumero':2,'Vastustaja':'Y','Pisteet':3,'Kausi':'2024-25','Sarja/Harjoitus':'Sarja','Pvm':'15/02/2025','Lopputulos':'Tappio'}
+  ];
+  setRows(ctx,rows);
+  const games=JSON.parse(vm.runInContext(`JSON.stringify(teamHistoryGames())`,ctx));
+  assert.equal(games[0].playerCount,2);
+  assert.equal(games[1].playerCount,3);
+  assert.equal(games[0].half,'autumn');
+  assert.equal(games[1].half,'spring');
+  const seasons=JSON.parse(vm.runInContext(`JSON.stringify(teamSeasonRows(teamHistoryGames()))`,ctx));
+  assert.equal(seasons[0].playersPerGame,2.5);
+});
+
 test('HTML loads shared utilities before application modules',()=>{
   const html=fs.readFileSync(path.join(ROOT,'index.html'),'utf8');
   assert.ok(html.indexOf('js/utils.js') < html.indexOf('js/data.js'));
+});
+
+test('history filter controls and PLR/G column are present',()=>{
+  const html=fs.readFileSync(path.join(ROOT,'index.html'),'utf8');
+  assert.match(html,/playerHistoryHalfSel/);
+  assert.match(html,/playerHistoryResultSel/);
+  assert.match(html,/teamHistoryHalfSel/);
+  assert.match(html,/teamHistoryResultSel/);
+  assert.match(html,/PLR\/G/);
 });
 
 test('dynamic table rows use DOM event listeners instead of inline onclick HTML',()=>{
