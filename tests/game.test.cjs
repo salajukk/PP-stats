@@ -13,164 +13,157 @@ function seeded(){
   let n=0;
   return()=>((n++*0.271828)%1);
 }
-function puzzle(category,role='random'){
-  return Generator.generatePuzzle({category,role,randomFn:seeded()});
+function puzzle(category){
+  return Generator.generatePuzzle({category,randomFn:seeded()});
 }
 
-test('left and right semantic side mappings match actual player locations',()=>{
-  ['LEFT','RIGHT'].forEach(side=>{
-    const s=Templates.sideData(side);
-    const state=Templates.baseState(side);
-    assert.equal(state.offense[s.slotPlayer].location,s.slot);
-    assert.equal(state.offense[s.oppositeSlotPlayer].location,s.oppositeSlot);
-    assert.equal(state.offense[s.wingPlayer].location,s.wing);
-    assert.equal(state.offense[s.oppositeWingPlayer].location,s.oppositeWing);
-  });
+test('rule library contains the 12 offensive movement rules',()=>{
+  assert.deepEqual(Rules.RULE_LIBRARY,[
+    'PASSER_MUST_MOVE','SLOT_TO_WING_THRU_CUT','EMPTY_SLOT_FILL','PERIMETER_ROTATION',
+    'SLOT_TO_SLOT_EXCHANGE','P5_WEAK_SIDE_POSITION','P5_SLOT_TO_WING_RELOCATION',
+    'P5_BALL_SCREEN_MOVEMENT','STRONG_SIDE_SHAKE','WEAK_SIDE_EXCHANGE',
+    'SCREENER_SECOND_CUT','DRIVE_SPACING'
+  ]);
 });
 
-test('levels are not used and all eight core categories are available',()=>{
-  const defs=Templates.list({role:'random'});
-  assert.equal(defs.length,8);
+test('there are exactly 15 first-version puzzle archetypes',()=>{
+  assert.equal(Templates.CATEGORIES.length,15);
+  assert.equal(Templates.DEFINITIONS.length,15);
+  Templates.CATEGORIES.forEach(category=>assert.ok(Templates.DEFINITIONS.some(d=>d.category===category)));
+});
+
+test('game state has five offensive players and no defense model',()=>{
+  const p=puzzle('THRU_CUT');
+  assert.equal(Object.keys(p.decisionState.offense).length,5);
+  assert.equal('defense' in p.decisionState,false);
+  const html=fs.readFileSync(path.join(ROOT,'game','index.html'),'utf8');
+  assert.doesNotMatch(html,/defenseLayer|Puolustaja|Read the Defense/i);
+});
+
+test('slot to wing creates thru-cut, two fills and P5 relocation',()=>{
+  const p=puzzle('THRU_CUT');
+  const all=p.allReactions;
+  assert.equal(all.length,4);
+  assert.equal(all[0].rule,'SLOT_TO_WING_THRU_CUT');
+  assert.equal(all[0].movement,'THRU_CUT');
+  assert.deepEqual(all[0].path[0],'RIM');
+  assert.equal(all[1].rule,'EMPTY_SLOT_FILL');
+  assert.equal(all[2].rule,'PERIMETER_ROTATION');
+  assert.equal(all[3].rule,'P5_SLOT_TO_WING_RELOCATION');
+});
+
+test('full thru-cut chain restores four unique perimeter spots',()=>{
+  const p=puzzle('THRU_CUT');
+  let s=Generator.clone(p.decisionState);
+  p.reactionQueue.forEach(r=>{s=Rules.applyReaction(s,r);});
+  assert.equal(Rules.validateSpacing(s).standard4Out,true);
+});
+
+test('first fill and second fill are derived from the same rule-engine chain',()=>{
+  const first=puzzle('FIRST_FILL');
+  const second=puzzle('SECOND_FILL');
+  assert.equal(first.reactionQueue[0].rule,'EMPTY_SLOT_FILL');
+  assert.equal(second.reactionQueue[0].rule,'PERIMETER_ROTATION');
+  assert.ok(first.playbackEvents.length>first.initialState.history.length);
+  assert.ok(second.playbackEvents.length>first.playbackEvents.length);
+});
+
+test('completed rotation asks for spacing confirmation after applying all reactions',()=>{
+  const p=puzzle('COMPLETED_ROTATION');
+  assert.equal(p.reactionQueue.length,1);
+  assert.equal(p.reactionQueue[0].type,'CONFIRM');
+  assert.equal(Rules.validateSpacing(p.decisionState).standard4Out,true);
+  assert.equal(Rules.evaluateInput(p.reactionQueue[0],{type:'CONFIRM'},p.decisionState).correct,true);
+});
+
+test('slot-to-slot pass creates exchange pair and P5 weak-side relocation',()=>{
+  const p=puzzle('SLOT_EXCHANGE');
+  assert.equal(p.allReactions.length,3);
+  assert.equal(p.allReactions[0].movement,'EXCHANGE');
+  assert.equal(p.allReactions[1].movement,'EXCHANGE');
+  assert.equal(p.allReactions[2].rule,'P5_WEAK_SIDE_POSITION');
+});
+
+test('P5 weak-side standalone stage is derived from slot exchange trigger',()=>{
+  const p=puzzle('P5_WEAK_SIDE');
+  assert.equal(p.reactionQueue.length,1);
+  assert.equal(p.reactionQueue[0].player,'P5');
+  assert.equal(p.reactionQueue[0].rule,'P5_WEAK_SIDE_POSITION');
+});
+
+test('ball-screen trigger creates screen, shake, weak-side exchange pair and roll',()=>{
+  const p=puzzle('BALL_SCREEN');
+  const rules=p.allReactions.map(r=>r.rule);
+  assert.deepEqual(rules,[
+    'P5_BALL_SCREEN_MOVEMENT',
+    'STRONG_SIDE_SHAKE',
+    'WEAK_SIDE_EXCHANGE',
+    'WEAK_SIDE_EXCHANGE',
+    'P5_BALL_SCREEN_MOVEMENT'
+  ]);
+  assert.equal(p.allReactions[0].type,'SCREEN');
+  assert.equal(p.allReactions[4].movement,'ROLL');
+});
+
+test('shake, weak-side exchange and roll puzzles start at their rule-derived stages',()=>{
+  assert.equal(puzzle('SHAKE').reactionQueue[0].rule,'STRONG_SIDE_SHAKE');
+  assert.equal(puzzle('WEAK_SIDE_EXCHANGE').reactionQueue[0].rule,'WEAK_SIDE_EXCHANGE');
+  assert.equal(puzzle('ROLL').reactionQueue[0].movement,'ROLL');
+});
+
+test('cutter inside makes screener pop and cutter outside makes screener dive',()=>{
+  const curl=puzzle('CUTTER_CURL');
+  const pop=puzzle('CUTTER_POP');
+  assert.equal(curl.reactionQueue[0].movement,'POP');
+  assert.equal(pop.reactionQueue[0].movement,'DIVE');
+  assert.equal(pop.reactionQueue[0].targetLocation,'RIM');
+});
+
+test('baseline drive makes opposite wing drift to opposite corner',()=>{
+  const p=puzzle('BASELINE_DRIVE');
+  const r=p.reactionQueue[0];
+  assert.equal(r.rule,'DRIVE_SPACING');
+  assert.equal(r.movement,'DRIFT');
+  assert.ok(/_CORNER$/.test(r.targetLocation));
+});
+
+test('occupied-spot answers are not accepted unless they equal the required reaction',()=>{
+  const p=puzzle('FIRST_FILL');
+  const expected=p.reactionQueue[0];
+  const wrong={type:'MOVE',player:expected.player,targetLocation:'RIGHT_WING'};
+  assert.equal(Rules.evaluateInput(expected,wrong,p.decisionState).correct,false);
+  const right={type:'MOVE',player:expected.player,targetLocation:expected.targetLocation};
+  assert.equal(Rules.evaluateInput(expected,right,p.decisionState).correct,true);
+});
+
+test('templates contain triggers, not hard-coded correct-answer fields',()=>{
+  const source=fs.readFileSync(path.join(ROOT,'game','js','templates.js'),'utf8');
+  assert.doesNotMatch(source,/correctAction|rankedSolutions|bestAction/);
+  assert.match(source,/SLOT_TO_WING_PASS/);
+  assert.match(source,/BALL_SCREEN_START/);
+  assert.match(source,/OFF_BALL_CUTTER_MOVE/);
+});
+
+test('game interaction is direct court movement without action menu or defense UI',()=>{
   const html=fs.readFileSync(path.join(ROOT,'game','index.html'),'utf8');
   const game=fs.readFileSync(path.join(ROOT,'game','js','game.js'),'utf8');
-  assert.doesNotMatch(html,/data-level=/);
-  assert.doesNotMatch(game,/selectedLevel|maxDifficulty/);
+  assert.doesNotMatch(html,/intentMenu|data-intent|defensePrompt|defenseLayer/);
+  assert.match(game,/submitInput\(\{type:"MOVE"/);
+  assert.match(game,/submitInput\(\{type:"SCREEN"/);
+  assert.match(html,/confirmSpacingBtn/);
 });
 
-test('every generated archetype has at least three visible actions before first decision',()=>{
-  Templates.CATEGORIES.forEach(category=>{
-    const p=puzzle(category);
-    assert.ok(p.prelude.length>=3,category+' prelude too short');
-    assert.ok(p.prelude.every(e=>e.duration>=900),category+' contains a fast event');
-  });
+test('animation pacing is deliberately slow and staged',()=>{
+  const game=fs.readFileSync(path.join(ROOT,'game','js','game.js'),'utf8');
+  assert.match(game,/CUE_MS=650/);
+  assert.match(game,/ACTION_MS=1050/);
+  assert.match(game,/SETTLE_MS=650/);
+  assert.match(game,/CONTINUE_MS=800/);
 });
 
-test('weighted random pool strongly favors possession chains',()=>{
-  const defs=Templates.list({role:'random'});
-  const pool=Generator.weightedDefinitions(defs);
-  const continuation=pool.filter(d=>d.continuationPotential).length;
-  assert.ok(continuation/pool.length>=0.75);
-});
-
-test('rule engine ranks thru cut over pass-and-stand',()=>{
-  const p=puzzle('PASS_AND_CUT','1');
-  const ranked=Rules.rankActions(p.decisionState);
-  assert.equal(ranked[0].action.cutType,'THRU');
-  assert.equal(ranked.find(x=>x.action.type==='HOLD').classification,'WRONG');
-});
-
-test('a correct pass-and-cut continues to a screen read in the same possession',()=>{
-  const p=puzzle('PASS_AND_CUT','1');
-  const best=p.rankedSolutions[0].action;
-  const next=Rules.nextDecisionState(p.decisionState,best);
-  assert.ok(next);
-  assert.equal(next.transitionEvents.length,2);
-  assert.ok(next.state.context.offBallScreen);
-  assert.equal(next.state.decisionPlayer,p.decisionState.decisionPlayer);
-});
-
-test('off-ball screen reads change with defender behavior',()=>{
-  assert.equal(puzzle('CURL_READ','3').rankedSolutions[0].action.cutType,'CURL');
-  assert.equal(puzzle('POP_READ','3').rankedSolutions[0].action.cutType,'STRAIGHT');
-  assert.equal(puzzle('BACKDOOR_READ','3').rankedSolutions[0].action.cutType,'BACKDOOR');
-});
-
-test('pop/straight can be selected by moving to the player current semantic spot',()=>{
-  const p=puzzle('POP_READ','4');
-  const player=p.decisionState.decisionPlayer;
-  const ownLocation=p.decisionState.offense[player].location;
-  const action=Rules.inferGestureAction(p.decisionState,{type:'MOVE',targetLocation:ownLocation},[]);
-  assert.equal(action.type,'CUT');
-  assert.equal(action.cutType,'STRAIGHT');
-  assert.equal(action.targetLocation,ownLocation);
-  assert.equal(Rules.evaluateActionObject(p.decisionState,action).selected.classification,'BEST');
-});
-
-test('correct screen read creates a second-cut decision',()=>{
-  const p=puzzle('CURL_READ','3');
-  const best=p.rankedSolutions[0].action;
-  const next=Rules.nextDecisionState(p.decisionState,best);
-  assert.ok(next);
-  assert.ok(next.state.context.secondCut);
-  assert.equal(next.state.decisionPlayer,p.decisionState.context.offBallScreen.screener);
-  assert.equal(Rules.rankActions(next.state)[0].action.cutType,'POP');
-});
-
-test('post entry can produce four consecutive rule-engine decisions',()=>{
-  const p=puzzle('POST_ENTRY','3');
-  const postPass=p.rankedSolutions[0].action;
-  assert.equal(postPass.type,'PASS');
-  assert.equal(postPass.targetPlayer,'P5');
-
-  const split=Rules.nextDecisionState(p.decisionState,postPass);
-  assert.ok(split&&split.state.context.splitScreen);
-  const splitScreen=Rules.rankActions(split.state)[0].action;
-  assert.equal(splitScreen.type,'SCREEN');
-
-  const cutterRead=Rules.nextDecisionState(split.state,splitScreen);
-  assert.ok(cutterRead&&cutterRead.state.context.offBallScreen);
-  const cutterAction=Rules.rankActions(cutterRead.state)[0].action;
-  assert.equal(cutterAction.type,'CUT');
-
-  const secondCut=Rules.nextDecisionState(cutterRead.state,cutterAction);
-  assert.ok(secondCut&&secondCut.state.context.secondCut);
-  assert.ok(Rules.rankActions(secondCut.state)[0].score>=75);
-});
-
-test('good post seal makes post entry the best first read',()=>{
-  const p=puzzle('POST_ENTRY','3');
-  assert.equal(p.rankedSolutions[0].action.type,'PASS');
-  assert.equal(p.rankedSolutions[0].action.targetPlayer,'P5');
-});
-
-test('hedge/show ball screen creates roller pass priority',()=>{
-  const p=puzzle('BALL_SCREEN_ROLLER_READ','1');
-  assert.equal(p.rankedSolutions[0].action.type,'PASS');
-  assert.equal(p.rankedSolutions[0].action.targetPlayer,'P5');
-});
-
-test('generated puzzles contain five-on-five state and computed ranking',()=>{
-  Templates.CATEGORIES.forEach(category=>{
-    const p=puzzle(category);
-    assert.equal(Object.keys(p.decisionState.offense).length,5);
-    assert.equal(Object.keys(p.decisionState.defense).length,5);
-    assert.ok(p.rankedSolutions.length>=2);
-    assert.ok(p.rankedSolutions[0].score>=75);
-  });
-});
-
-test('classification scoring rewards best more than acceptable and wrong is negative',()=>{
-  assert.ok(Logic.pointsForOutcome(1.5,'BEST',0)>Logic.pointsForOutcome(1.5,'ACCEPTABLE',0));
-  assert.equal(Logic.pointsForOutcome(1.5,'WRONG',0),-30);
-});
-
-test('animation runtime has explicit cue, motion and settle beats',()=>{
-  const source=fs.readFileSync(path.join(ROOT,'game','js','game.js'),'utf8');
-  assert.match(source,/CUE_MS=450/);
-  assert.match(source,/ACTION_MS=900/);
-  assert.match(source,/STEP_PAUSE_MS=550/);
-  assert.match(source,/var duration=event\.duration\|\|ACTION_MS/);
-  assert.match(source,/transitionEvents/);
-});
-
-test('gesture UI stays field-driven and arrow-free',()=>{
-  const html=fs.readFileSync(path.join(ROOT,'game','index.html'),'utf8');
-  const js=fs.readFileSync(path.join(ROOT,'game','js','game.js'),'utf8');
-  assert.match(html,/data-intent="PASS"/);
-  assert.match(html,/data-intent="MOVE"/);
-  assert.doesNotMatch(html,/actionChoices|answerArrow|eventPath|choicePath/);
-  assert.match(js,/LONG_PRESS_MS/);
-  assert.match(js,/handleCourtPointerUp/);
-  assert.match(js,/nearestSpot/);
-  assert.match(js,/ownLocation.*commitIntent/s);
-  assert.match(js,/animatePop/);
-  assert.match(js,/oma pelaaja = pop\/straight/);
-});
-
-test('runtime stores attempts and schedules spaced repetition',()=>{
-  const source=fs.readFileSync(path.join(ROOT,'game','js','game.js'),'utf8');
-  assert.match(source,/mistakeType/);
-  assert.match(source,/ppstats-motion-attempts-v2/);
-  assert.match(source,/scheduleReview/);
-  assert.match(source,/dueReview/);
+test('scoring is binary movement correctness rather than best-good-acceptable ranking',()=>{
+  assert.ok(Logic.pointsForAnswer(2,true,0)>0);
+  assert.equal(Logic.pointsForAnswer(2,false,0),-30);
+  const rules=fs.readFileSync(path.join(ROOT,'game','js','rules.js'),'utf8');
+  assert.doesNotMatch(rules,/BEST|GOOD|ACCEPTABLE|screenCoverage|denyLevel/);
 });

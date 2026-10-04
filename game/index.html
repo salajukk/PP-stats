@@ -4,7 +4,7 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
   <meta name="theme-color" content="#0d0f14">
-  <title>Villanova Motion · PP Stats</title>
+  <title>Villanova 4-Out Motion · PP Stats</title>
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Bebas+Neue&family=DM+Sans:wght@400;500;600;700&display=swap" rel="stylesheet">
@@ -15,37 +15,36 @@
     <section id="setupScreen" class="setup-screen">
       <header class="game-topbar">
         <a class="back-link" href="../">← PP Stats</a>
-        <span class="mini-brand">MOTION PUZZLES</span>
+        <span class="mini-brand">4-OUT MOTION</span>
       </header>
 
       <div class="setup-content">
         <p class="kicker">VILLANOVA 4-OUT MOTION</p>
-        <h1>Read the Defense</h1>
-        <p class="lead">Seuraa koko possessionia rauhassa. Kun peli pysähtyy, tee päätös puolustuksen perusteella — oikea read voi käynnistää heti seuraavan päätöksen samassa hyökkäyksessä.</p>
+        <h1>Move Together</h1>
+        <p class="lead">Katso mitä pallo tai toinen hyökkääjä tekee. Kun peli pysähtyy, siirrä keltainen pelaaja siihen tilaan, johon hänen pitää seuraavaksi liikkua.</p>
 
         <section class="setup-card">
-          <div class="setup-group">
-            <div class="setup-label">Pelipaikka</div>
-            <div class="role-grid" role="group" aria-label="Pelipaikka">
-              <button class="choice active" data-role="random">Kaikki</button>
-              <button class="choice" data-role="1">PG</button>
-              <button class="choice" data-role="2">SG</button>
-              <button class="choice" data-role="3">SF</button>
-              <button class="choice" data-role="4">PF</button>
-              <button class="choice" data-role="5">C</button>
-            </div>
+          <div class="principle">
+            <strong>Ydinajatus</strong>
+            <span>EVENT → SPACE OPENS → PLAYER REACTS → SPACING RESTORED</span>
           </div>
 
           <div class="setup-group">
             <div class="setup-label">Pelimuoto</div>
             <div class="mode-grid">
-              <button class="mode-choice active" data-mode="practice"><strong>Practice</strong><span>Selitys + spaced repetition</span></button>
-              <button class="mode-choice" data-mode="challenge"><strong>Challenge</strong><span>20 tilannetta</span></button>
+              <button class="mode-choice active" data-mode="practice">
+                <strong>Practice</strong>
+                <span>Selitys väärästä vastauksesta</span>
+              </button>
+              <button class="mode-choice" data-mode="challenge">
+                <strong>Challenge</strong>
+                <span>20 possessionia</span>
+              </button>
             </div>
           </div>
 
           <button id="startBtn" class="primary-btn">Aloita</button>
-          <p class="thumb-tip">Puolustus = tummat D-pelaajat. Aktiivinen hyökkääjä = keltainen.</p>
+          <p class="thumb-tip">Ei puolustajia. Keskity vain viiden hyökkääjän spacingiin ja liikkeeseen.</p>
         </section>
       </div>
     </section>
@@ -53,8 +52,11 @@
     <section id="playScreen" class="play-screen hidden">
       <header class="play-topbar">
         <button id="exitBtn" class="icon-btn" aria-label="Lopeta">×</button>
-        <div class="play-brand"><span id="categoryLabel">PASS & CUT</span><strong id="roundLabel">Practice · 1</strong></div>
-        <div class="role-badge" id="roleBadge">PG</div>
+        <div class="play-brand">
+          <span id="categoryLabel">THRU CUT</span>
+          <strong id="roundLabel">Practice · 1</strong>
+        </div>
+        <div class="role-badge" id="roleBadge">P1</div>
       </header>
 
       <div class="hud">
@@ -64,39 +66,36 @@
       </div>
 
       <section class="trigger-panel" aria-live="polite">
-        <div class="trigger-row"><span id="triggerState" class="trigger-state">TILANNE</span><span id="eventCounter" class="event-counter"></span></div>
+        <div class="trigger-row">
+          <span id="triggerState" class="trigger-state">TILANNE</span>
+          <span id="eventCounter" class="event-counter"></span>
+        </div>
         <strong id="triggerText">Katso mitä tapahtuu.</strong>
         <small id="decisionHint"></small>
       </section>
 
       <div class="court-shell">
         <div id="court" class="court" aria-label="Koripallokenttä">
-          <div class="paint"></div><div class="free-throw"></div><div class="three-arc"></div><div class="backboard"></div><div class="hoop"></div>
-<div id="spotsLayer"></div>
-          <div id="defenseLayer"></div>
+          <div class="paint"></div>
+          <div class="free-throw"></div>
+          <div class="three-arc"></div>
+          <div class="backboard"></div>
+          <div class="hoop"></div>
+          <div id="spotsLayer"></div>
           <div id="playersLayer"></div>
           <div id="ball" class="ball"></div>
           <div id="tapMarker" class="tap-marker hidden"></div>
-          <div id="intentMenu" class="intent-menu hidden" role="menu" aria-label="Valitse toiminto">
-            <button type="button" class="intent pass" data-intent="PASS"><span>↗</span><strong>Syötä</strong></button>
-            <button type="button" class="intent drive" data-intent="DRIVE"><span>⚡</span><strong>Aja</strong></button>
-            <button type="button" class="intent move" data-intent="MOVE"><span>↔</span><strong>Liiku</strong></button>
-            <button type="button" class="intent shoot" data-intent="SHOOT"><span>◎</span><strong>Heitä</strong></button>
-          </div>
         </div>
       </div>
 
-      <section id="decisionDock" class="decision-dock">
+      <section class="decision-dock">
         <div class="decision-dock-head">
-          <strong id="actionPrompt">Seuraa tapahtumia…</strong>
-          <span id="defensePrompt"></span>
+          <strong id="actionPrompt">Seuraa tapahtumaa…</strong>
+          <span id="rulePrompt"></span>
         </div>
-        <div class="gesture-row">
-          <span id="gestureStatus">Kun peli pysähtyy, pidä keltaista pelaajaa pohjassa.</span>
-          <button id="cancelIntentBtn" class="cancel-intent hidden" type="button">Peruuta</button>
-        </div>
-        <div id="chainStatus" class="chain-status hidden"></div>
+        <div id="gestureStatus" class="gesture-status">Päätös tulee animaation jälkeen.</div>
         <div id="possessionStatus" class="possession-status hidden"></div>
+        <button id="confirmSpacingBtn" class="confirm-spacing hidden" type="button">Spacing on valmis</button>
       </section>
     </section>
 
@@ -106,14 +105,16 @@
         <span class="mini-brand">CHALLENGE</span>
       </header>
       <div class="results-content">
-        <p class="kicker">20 TILANNETTA</p><h1>Tulos</h1><div class="result-score" id="resultScore">0</div>
+        <p class="kicker">20 POSSESSIONIA</p>
+        <h1>Tulos</h1>
+        <div class="result-score" id="resultScore">0</div>
         <div class="result-grid">
-          <div><span>Best</span><strong id="resultBestReads">0</strong></div>
-          <div><span>Good</span><strong id="resultGood">0</strong></div>
-          <div><span>Acceptable</span><strong id="resultAcceptable">0</strong></div>
-          <div><span>Poor / wrong</span><strong id="resultMisses">0</strong></div>
+          <div><span>Oikein</span><strong id="resultCorrect">0</strong></div>
+          <div><span>Väärin</span><strong id="resultWrong">0</strong></div>
+          <div><span>Päätöksiä</span><strong id="resultDecisions">0</strong></div>
           <div><span>Keski-aika</span><strong id="resultAvg">0.00 s</strong></div>
           <div><span>Paras streak</span><strong id="resultStreak">0</strong></div>
+          <div><span>Tarkkuus</span><strong id="resultAccuracy">0%</strong></div>
         </div>
         <button id="replayBtn" class="primary-btn">Pelaa uudelleen</button>
         <a class="secondary-btn" href="../">Takaisin PP Statsiin</a>
@@ -124,8 +125,11 @@
     <aside id="feedbackSheet" class="feedback-sheet hidden" aria-live="assertive">
       <div class="sheet-handle"></div>
       <div class="feedback-head">
-        <div><span id="feedbackEyebrow">BEST</span><strong id="feedbackTitle">+100</strong></div>
-        <div id="feedbackTime" class="feedback-time">0.82 s</div>
+        <div>
+          <span id="feedbackEyebrow">OIKEIN</span>
+          <strong id="feedbackTitle">+100</strong>
+        </div>
+        <div id="feedbackTime" class="feedback-time">1.24 s</div>
       </div>
       <p id="selectedActionText" class="selected-action"></p>
       <p id="feedbackText"></p>

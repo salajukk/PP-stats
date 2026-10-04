@@ -16,10 +16,13 @@
 
     if(event.type==="PASS"){
       var target=next.offense[event.toPlayer];
-      if(target){next.ballHandler=event.toPlayer;next.ballLocation=target.location;}
+      if(target){
+        next.ballHandler=event.toPlayer;
+        next.ballLocation=target.location;
+      }
     }
 
-    if(event.type==="MOVE"||event.type==="CUT"){
+    if(event.type==="MOVE"||event.type==="DRIVE"){
       var player=next.offense[event.player];
       if(player){
         var path=event.path||[];
@@ -31,44 +34,23 @@
 
     if(event.type==="GROUP"){
       (event.moves||[]).forEach(function(move){
-        var mover=next.offense[move.player];if(!mover)return;
+        var mover=next.offense[move.player];
+        if(!mover)return;
         var path=move.path||[];
         if(move.to)mover.location=move.to;
         else if(path.length)mover.location=path[path.length-1];
-        if(next.ballHandler===move.player)next.ballLocation=mover.location;
       });
     }
 
-    if(event.type==="SCREEN"&&event.moveTo&&next.offense[event.player]){
-      next.offense[event.player].location=event.moveTo;
-    }
-
-    if(event.type==="DEFENSE"&&event.defender&&next.defense[event.defender]){
-      Object.assign(next.defense[event.defender],event.changes||{});
+    if(event.type==="SCREEN"){
+      var screener=next.offense[event.player];
+      if(screener){
+        screener.screeningTarget=event.targetPlayer;
+        screener.screeningLocation=event.targetLocation;
+      }
     }
 
     return next;
-  }
-
-  function deriveDecisionState(template){
-    return template.prelude.reduce(function(state,event){return applyEvent(state,event);},clone(template.initialState));
-  }
-
-  function validateState(state){
-    var issues=[];
-    var offenseIds=Object.keys(state.offense||{});
-    var defenseIds=Object.keys(state.defense||{});
-    if(offenseIds.length!==5)issues.push("offense must contain five players");
-    if(defenseIds.length!==5)issues.push("defense must contain five defenders");
-    if(!state.offense[state.decisionPlayer])issues.push("decisionPlayer must exist");
-    if(!state.offense[state.ballHandler])issues.push("ballHandler must exist");
-    offenseIds.forEach(function(id){if(!state.offense[id].location)issues.push(id+" missing location");});
-    defenseIds.forEach(function(id){if(!state.defense[id].guarding)issues.push(id+" missing guarding");});
-    return issues;
-  }
-
-  function meaningful(ranked){
-    return !!(ranked&&ranked.length>=2&&ranked[0].score>=75);
   }
 
   function weightedDefinitions(defs){
@@ -89,48 +71,71 @@
     return pool[Math.floor(random()*pool.length)];
   }
 
+  function buildPuzzle(template){
+    var triggerState=template.prelude.reduce(function(state,event){
+      return applyEvent(state,event);
+    },clone(template.initialState));
+
+    var allReactions=Rules.getRequiredReactions(triggerState,template.trigger);
+    if(!allReactions.length)throw new Error("Rule engine returned no reactions for "+template.category);
+
+    var start=Math.max(0,Number(template.startReaction)||0);
+    var playbackEvents=clone(template.prelude);
+    var decisionState=clone(triggerState);
+
+    for(var i=0;i<Math.min(start,allReactions.length);i++){
+      var previous=allReactions[i];
+      playbackEvents.push(Rules.reactionToEvent(previous));
+      decisionState=Rules.applyReaction(decisionState,previous);
+    }
+
+    var reactionQueue;
+    if(template.confirmSpacing){
+      for(var j=start;j<allReactions.length;j++){
+        playbackEvents.push(Rules.reactionToEvent(allReactions[j]));
+        decisionState=Rules.applyReaction(decisionState,allReactions[j]);
+      }
+      reactionQueue=[Rules.confirmAction("Tunnista, että rotaatio on palauttanut neljä yksilöllistä perimeter-paikkaa.")];
+    }else{
+      reactionQueue=allReactions.slice(start);
+    }
+
+    if(!reactionQueue.length)throw new Error("Puzzle has no decision: "+template.category);
+
+    return{
+      category:template.category,
+      initialState:clone(template.initialState),
+      trigger:clone(template.trigger),
+      playbackEvents:playbackEvents,
+      decisionState:decisionState,
+      reactionQueue:reactionQueue,
+      allReactions:allReactions,
+      finalValidation:template.confirmSpacing?"STANDARD_4_OUT":null
+    };
+  }
+
   function generatePuzzle(options){
     options=options||{};
     var random=options.randomFn||Math.random;
-    var defs=Templates.list({role:options.role||"random"});
-    if(!defs.length)defs=Templates.list({role:"random"});
-    if(!defs.length)throw new Error("No puzzle templates available.");
-
-    for(var attempt=0;attempt<30;attempt+=1){
-      var def=chooseDefinition(defs,random,options.category);
-      var template=def.build(random,String(options.role||"random"));
-      if(!template.prelude||template.prelude.length<3)continue;
-      var decisionState=deriveDecisionState(template);
-      var issues=validateState(decisionState);
-      var ranked=Rules.rankActions(decisionState);
-
-      if(!issues.length&&meaningful(ranked)){
-        return{
-          id:template.category+"-"+Date.now()+"-"+Math.floor(random()*100000),
-          category:template.category,
-          initialState:clone(template.initialState),
-          prelude:clone(template.prelude),
-          decisionPlayer:decisionState.decisionPlayer,
-          decisionState:decisionState,
-          candidateActions:ranked.map(function(item){return item.action;}),
-          rankedSolutions:ranked,
-          decisionLabel:template.decisionLabel,
-          teachingPoint:template.teachingPoint,
-          continuationPotential:!!template.continuationPotential
-        };
-      }
-    }
-    throw new Error("Could not generate a meaningful puzzle.");
+    var defs=Templates.list();
+    var def=chooseDefinition(defs,random,options.category);
+    var template=def.build(random);
+    var puzzle=buildPuzzle(template);
+    puzzle.id=puzzle.category+"-"+Date.now()+"-"+Math.floor(random()*100000);
+    return puzzle;
   }
 
   function generateQueue(count,options){
-    var result=[],previous=null;options=options||{};
-    for(var i=0;i<count;i+=1){
+    var result=[],previous=null;
+    options=options||{};
+    for(var i=0;i<count;i++){
       var puzzle=generatePuzzle(options),guard=0;
       while(puzzle.category===previous&&guard<8){
-        puzzle=generatePuzzle(options);guard+=1;
+        puzzle=generatePuzzle(options);
+        guard++;
       }
-      result.push(puzzle);previous=puzzle.category;
+      result.push(puzzle);
+      previous=puzzle.category;
     }
     return result;
   }
@@ -138,9 +143,8 @@
   return{
     clone:clone,
     applyEvent:applyEvent,
-    deriveDecisionState:deriveDecisionState,
-    validateState:validateState,
     weightedDefinitions:weightedDefinitions,
+    buildPuzzle:buildPuzzle,
     generatePuzzle:generatePuzzle,
     generateQueue:generateQueue
   };
