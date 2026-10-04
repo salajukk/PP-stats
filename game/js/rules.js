@@ -398,29 +398,155 @@
 
 
 
+  function applyActionToState(state,action){
+    var next=clone(state);
+    next.history=(next.history||[]).concat([{type:action.type,player:action.player,targetPlayer:action.targetPlayer,targetLocation:action.targetLocation}]);
+    if(action.type==="PASS"){
+      var target=next.offense[action.targetPlayer];
+      if(target){next.ballHandler=action.targetPlayer;next.ballLocation=target.location;}
+    }else if(action.type==="CUT"||action.type==="FILL"){
+      if(next.offense[action.player])next.offense[action.player].location=action.targetLocation;
+      if(next.ballHandler===action.player)next.ballLocation=action.targetLocation;
+    }else if(action.type==="DRIVE"){
+      if(next.offense[action.player])next.offense[action.player].location="RIM";
+      next.ballHandler=action.player;next.ballLocation="RIM";
+    }
+    return next;
+  }
+
+  function applyEventToState(state,event){
+    var next=clone(state);
+    if(event.type==="MOVE"||event.type==="CUT"){
+      var mover=next.offense[event.player];
+      if(mover){
+        var path=event.path||[];
+        if(event.to)mover.location=event.to;
+        else if(path.length)mover.location=path[path.length-1];
+      }
+    }else if(event.type==="SCREEN"&&event.moveTo&&next.offense[event.player]){
+      next.offense[event.player].location=event.moveTo;
+    }else if(event.type==="GROUP"){
+      (event.moves||[]).forEach(function(move){
+        var player=next.offense[move.player];if(!player)return;
+        var path=move.path||[];
+        if(move.to)player.location=move.to;
+        else if(path.length)player.location=path[path.length-1];
+      });
+    }
+    return next;
+  }
+
+  function setScreenDefense(state,player,coverage){
+    var d=getDefender(state,player);
+    if(!d)return;
+    d.screenCoverage=coverage==="TOP_LOCK"?"TRAIL":coverage;
+    d.denyLevel=coverage==="TOP_LOCK"?"HARD":"NONE";
+    if(coverage==="TOP_LOCK")d.overplay="TOP_LOCK";
+    else delete d.overplay;
+  }
+
+  function fadeLocation(location){
+    if(location&&location.indexOf("LEFT_")===0)return"LEFT_CORNER";
+    if(location&&location.indexOf("RIGHT_")===0)return"RIGHT_CORNER";
+    return"RIGHT_CORNER";
+  }
+
   function nextDecisionState(state,action){
     var ctx=state.context||{};
-    if(ctx.postEntry&&action&&action.type==="PASS"&&action.targetPlayer===ctx.postEntry.postPlayer){
-      var next=clone(state);
+    if(!action)return null;
+    var next=applyActionToState(state,action);
+
+    if(ctx.trigger&&ctx.trigger.type==="SLOT_TO_WING_PASS"&&action.type==="CUT"&&action.cutType==="THRU"){
+      var cutter=action.player;
+      var screener=ctx.trigger.nextScreenScreener||"P5";
+      var targetLocation=next.offense[cutter].location;
+      var transitionEvents=[
+        {type:"MOVE",player:screener,to:ctx.trigger.nextScreenApproach,label:"5 siirtyy weak-side screeniin",duration:900},
+        {type:"SCREEN",player:screener,targetPlayer:cutter,screenType:"OFF_BALL",moveTo:targetLocation,label:"5 asettaa screenin cutterille",duration:900}
+      ];
+      transitionEvents.forEach(function(event){next=applyEventToState(next,event);});
+      setScreenDefense(next,cutter,ctx.trigger.nextScreenCoverage||"TRAIL");
+      next.decisionPlayer=cutter;
+      next.context={
+        offBallScreen:{
+          cutter:cutter,screener:screener,
+          curlTarget:"RIM",
+          popTarget:targetLocation,
+          fadeTarget:ctx.trigger.nextScreenFade||fadeLocation(targetLocation)
+        }
+      };
+      return{
+        state:next,
+        transitionEvents:transitionEvents,
+        decisionLabel:"5 tuli screeniin. Miten käytät screenin puolustajan mukaan?",
+        teachingPoint:"Lue screenipuolustus: trail → curl, under → pop/straight, top-lock → backdoor."
+      };
+    }
+
+    if(ctx.postEntry&&action.type==="PASS"&&action.targetPlayer===ctx.postEntry.postPlayer){
       var passer=state.decisionPlayer;
-      var post=ctx.postEntry.postPlayer;
-      next.ballHandler=post;
-      next.ballLocation=next.offense[post].location;
       next.decisionPlayer=passer;
       next.context={
         splitScreen:{
           passer:passer,
-          postPlayer:post,
-          screenTarget:ctx.postEntry.splitScreenTarget||nearestOtherPerimeter(next,passer)
+          postPlayer:ctx.postEntry.postPlayer,
+          screenTarget:ctx.postEntry.splitScreenTarget||nearestOtherPerimeter(next,passer),
+          screenCoverage:ctx.postEntry.splitCoverage||"TRAIL"
         }
       };
-      next.history=(next.history||[]).concat([{type:"PASS",fromPlayer:passer,toPlayer:post,label:"Post entry"}]);
       return{
         state:next,
+        transitionEvents:[],
         decisionLabel:"Pallo on postissa. Mitä syöttäjä tekee nyt?",
-        teachingPoint:"Post entryn jälkeen syöttäjä jatkaa: screen lähimmälle perimeter-pelaajalle."
+        teachingPoint:"Post entryn jälkeen syöttäjä jatkaa heti split-actioniin."
       };
     }
+
+    if(ctx.splitScreen&&action.type==="SCREEN"&&action.targetPlayer===ctx.splitScreen.screenTarget){
+      var splitScreener=action.player;
+      var splitCutter=action.targetPlayer;
+      var cutterLocation=next.offense[splitCutter].location;
+      next.offense[splitScreener].location=cutterLocation;
+      setScreenDefense(next,splitCutter,ctx.splitScreen.screenCoverage||"TRAIL");
+      next.decisionPlayer=splitCutter;
+      next.context={
+        offBallScreen:{
+          cutter:splitCutter,
+          screener:splitScreener,
+          curlTarget:"RIM",
+          popTarget:cutterLocation,
+          fadeTarget:fadeLocation(cutterLocation)
+        }
+      };
+      return{
+        state:next,
+        transitionEvents:[],
+        decisionLabel:"Split screen on paikallaan. Miten cutter lukee puolustajan?",
+        teachingPoint:"Splitissä cutter ottaa puolustuksen antaman tilan."
+      };
+    }
+
+    if(ctx.offBallScreen&&action.type==="CUT"){
+      var secondScreener=ctx.offBallScreen.screener;
+      var cutterAction=action.cutType==="STRAIGHT"?"POP":action.cutType;
+      next.decisionPlayer=secondScreener;
+      next.context={
+        secondCut:{
+          screener:secondScreener,
+          cutter:ctx.offBallScreen.cutter,
+          cutterAction:cutterAction,
+          rollLocation:"RIM",
+          popLocation:ctx.offBallScreen.popTarget
+        }
+      };
+      return{
+        state:next,
+        transitionEvents:[],
+        decisionLabel:"Cutter teki readin. Mikä on screenerin second cut?",
+        teachingPoint:"Read opposite: cutter sisään → screener ulos; cutter ulos → screener sisään."
+      };
+    }
+
     return null;
   }
 
@@ -509,6 +635,7 @@
     sequencePrefixMatches:sequencePrefixMatches,
     inferGestureAction:inferGestureAction,
     evaluateActionObject:evaluateActionObject,
+    applyActionToState:applyActionToState,
     nextDecisionState:nextDecisionState,
     clone:clone,
     getDefender:getDefender

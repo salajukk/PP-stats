@@ -5,8 +5,10 @@
   var Rules=window.GameRules;
   var Generator=window.PuzzleGenerator;
   var LONG_PRESS_MS=430;
-  var ACTION_MS=620;
-  var STEP_PAUSE_MS=320;
+  var CUE_MS=450;
+  var ACTION_MS=900;
+  var STEP_PAUSE_MS=550;
+  var CONTINUE_PAUSE_MS=750;
   var ROLES={P1:"PG",P2:"SG",P3:"SF",P4:"PF",P5:"C"};
   var CATEGORY_LABELS={
     PASS_AND_CUT:"PASS & CUT",FILL:"FILL",CURL_READ:"SCREEN · CURL",POP_READ:"SCREEN · POP",
@@ -19,7 +21,7 @@
     LEFT_CORNER:{x:8,y:20},RIGHT_CORNER:{x:92,y:20},LEFT_SHAKE:{x:23,y:58},RIGHT_SHAKE:{x:77,y:58}
   };
 
-  var selectedRole="random",selectedMode="practice",selectedLevel=2;
+  var selectedRole="random",selectedMode="practice";
   var state=freshState();
   var el={};
   [
@@ -32,9 +34,6 @@
 
   document.querySelectorAll("[data-role]").forEach(function(button){
     button.addEventListener("click",function(){selectedRole=button.dataset.role;activateGroup("[data-role]",button);});
-  });
-  document.querySelectorAll("[data-level]").forEach(function(button){
-    button.addEventListener("click",function(){selectedLevel=Number(button.dataset.level);activateGroup("[data-level]",button);});
   });
   document.querySelectorAll("[data-mode]").forEach(function(button){
     button.addEventListener("click",function(){selectedMode=button.dataset.mode;activateGroup("[data-mode]",button);});
@@ -78,76 +77,81 @@
     state.round+=1;state.decisionNumber=0;state.roundToken+=1;
     var token=state.roundToken;
     var review=dueReview();
-    state.puzzle=Generator.generatePuzzle({maxDifficulty:selectedLevel,role:selectedRole,category:review?review.category:null});
+    state.puzzle=Generator.generatePuzzle({role:selectedRole,category:review?review.category:null});
     state.displayState=Generator.clone(state.puzzle.initialState);
     state.decisionState=Generator.clone(state.puzzle.decisionState);
-    state.decisionLabel=state.puzzle.decisionLabel;state.teachingPoint=state.puzzle.teachingPoint;
+    state.decisionLabel=state.puzzle.decisionLabel;
+    state.teachingPoint=state.puzzle.teachingPoint;
     state.accepting=false;
 
     el.categoryLabel.textContent=CATEGORY_LABELS[state.puzzle.category]||state.puzzle.category;
     el.roundLabel.textContent=selectedMode==="challenge"?"Challenge · "+state.round+"/20":"Practice · "+state.round;
     el.triggerState.textContent="TILANNE";el.triggerState.classList.remove("live");
-    el.triggerText.textContent="Katso rauhassa mitä tapahtuu.";el.decisionHint.textContent="";
-    el.actionPrompt.textContent="Seuraa possessionia…";el.defensePrompt.textContent="";
+    el.triggerText.textContent="Katso rauhassa koko possession.";el.decisionHint.textContent="";
+    el.actionPrompt.textContent="Seuraa tapahtumia yksi kerrallaan…";el.defensePrompt.textContent="";
     el.gestureStatus.textContent="Päätös tulee vasta animaation jälkeen.";
     el.chainStatus.classList.add("hidden");el.possessionStatus.classList.add("hidden");el.timer.textContent="—";
 
     renderCourt(true);
-    await wait(450);
+    await wait(700);
     for(var i=0;i<state.puzzle.prelude.length;i++){
       if(token!==state.roundToken)return;
-      await animatePreludeEvent(state.puzzle.prelude[i],i,state.puzzle.prelude.length);
+      await animateEvent(state.puzzle.prelude[i],"VAIHE "+(i+1)+"/"+state.puzzle.prelude.length);
       state.displayState=Generator.applyEvent(state.displayState,state.puzzle.prelude[i]);
       updateCourt();
       await wait(STEP_PAUSE_MS);
     }
     if(token!==state.roundToken)return;
+    await wait(350);
     beginDecision();
   }
 
-  async function animatePreludeEvent(event,index,total){
-    el.eventCounter.textContent=(index+1)+"/"+total;
+  async function animateEvent(event,counterText){
+    var duration=event.duration||ACTION_MS;
+    el.eventCounter.textContent=counterText||"";
     el.triggerText.textContent=event.label;
     clearEventFocus();
 
     if(event.type==="PASS"){
       focusPlayer(event.fromPlayer);focusPlayer(event.toPlayer);
+      await wait(CUE_MS);
       var target=state.displayState.offense[event.toPlayer];
-      if(target&&SPOTS[target.location])moveBallToPoint(SPOTS[target.location],ACTION_MS);
-      await wait(ACTION_MS);
+      if(target&&SPOTS[target.location])moveBallToPoint(SPOTS[target.location],duration);
+      await wait(duration);
       clearEventFocus();return;
     }
 
     if(event.type==="GROUP"){
       var moves=event.moves||[];
       moves.forEach(function(move){focusPlayer(move.player);});
-      await animateGroupMoves(moves,ACTION_MS);
+      await wait(CUE_MS);
+      await animateGroupMoves(moves,duration);
       clearEventFocus();return;
     }
 
     if(event.type==="MOVE"||event.type==="CUT"){
       focusPlayer(event.player);
-      var path=(event.path||[]).slice();
-      if(event.to)path=[event.to];
-      await animatePlayerPath(event.player,path,ACTION_MS);
+      await wait(CUE_MS);
+      var path=(event.path||[]).slice();if(event.to)path=[event.to];
+      await animatePlayerPath(event.player,path,duration);
       clearEventFocus();return;
     }
 
     if(event.type==="SCREEN"){
       focusPlayer(event.player);focusPlayer(event.targetPlayer);
-      await animateScreen(event.player,event.targetPlayer,ACTION_MS);
+      await wait(CUE_MS);
+      await animateScreen(event.player,event.targetPlayer,duration);
       clearEventFocus();return;
     }
 
-    await wait(ACTION_MS);
+    await wait(CUE_MS+duration);
   }
 
   async function animateGroupMoves(moves,duration){
-    var promises=moves.map(function(move){
+    await Promise.all(moves.map(function(move){
       var path=(move.path||[]).slice();if(move.to)path=[move.to];
       return animatePlayerPath(move.player,path,duration);
-    });
-    await Promise.all(promises);
+    }));
   }
 
   async function animatePlayerPath(playerId,path,totalDuration){
@@ -174,17 +178,22 @@
   }
 
   function beginDecision(){
-    state.decisionNumber+=1;state.displayState=Generator.clone(state.decisionState);
+    state.decisionNumber+=1;
+    state.displayState=Generator.clone(state.decisionState);
     state.accepting=true;clearInteraction();updateCourt();
+
     el.roleBadge.textContent=ROLES[state.decisionState.decisionPlayer]||state.decisionState.decisionPlayer;
     el.triggerState.textContent="PÄÄTÖS "+state.decisionNumber;el.triggerState.classList.add("live");
-    el.eventCounter.textContent="";el.triggerText.textContent=state.decisionLabel;
+    el.eventCounter.textContent="";
+    el.triggerText.textContent=state.decisionLabel;
     el.decisionHint.textContent="Päätöksentekijä: "+state.decisionState.decisionPlayer+" · "+ROLES[state.decisionState.decisionPlayer];
-    el.actionPrompt.textContent="Tee ratkaisu kentällä";el.defensePrompt.textContent=defenseReadText(state.decisionState);
+    el.actionPrompt.textContent="Tee ratkaisu kentällä";
+    el.defensePrompt.textContent=defenseReadText(state.decisionState);
     el.gestureStatus.textContent="Pidä keltaista SINÄ-pelaajaa pohjassa.";
     el.possessionStatus.classList.toggle("hidden",state.decisionNumber===1);
     if(state.decisionNumber>1)el.possessionStatus.textContent="Sama possession jatkuu · päätös "+state.decisionNumber;
-    state.startedAt=performance.now();state.timer=window.setInterval(updateTimer,33);
+    state.startedAt=performance.now();
+    state.timer=window.setInterval(updateTimer,33);
   }
 
   function renderCourt(initial){
@@ -192,7 +201,8 @@
       el.playersLayer.innerHTML="";el.defenseLayer.innerHTML="";
       Object.keys(state.displayState.offense).forEach(function(id){
         var p=document.createElement("button");p.type="button";p.className="player";p.dataset.player=id;
-        p.innerHTML="<span>"+id.replace("P","")+"</span><small>"+ROLES[id]+"</small>";bindPlayerEvents(p,id);el.playersLayer.appendChild(p);
+        p.innerHTML="<span>"+id.replace("P","")+"</span><small>"+ROLES[id]+"</small>";
+        bindPlayerEvents(p,id);el.playersLayer.appendChild(p);
       });
       Object.keys(state.displayState.defense).forEach(function(id){
         var d=document.createElement("div");d.className="defender";d.dataset.defender=id;
@@ -246,50 +256,80 @@
   function handleCourtPointerUp(e){
     if(!state.accepting||state.gestureMode!=="MOVE")return;
     if(e.target.closest(".player,.intent-menu,.intent,.cancel-intent"))return;
-    var rect=el.court.getBoundingClientRect(),x=(e.clientX-rect.left)/rect.width*100,y=(e.clientY-rect.top)/rect.height*100;
-    showTapMarker(x,y);commitIntent({type:"MOVE",targetLocation:nearestSpot(x,y)});
+    var rect=el.court.getBoundingClientRect();
+    var x=(e.clientX-rect.left)/rect.width*100,y=(e.clientY-rect.top)/rect.height*100;
+    showTapMarker(x,y);
+    commitIntent({type:"MOVE",targetLocation:nearestSpot(x,y)});
   }
 
   function commitIntent(intent){
-    cancelIntent();commitAction(Rules.inferGestureAction(state.decisionState,intent,[]));
+    cancelIntent();
+    commitAction(Rules.inferGestureAction(state.decisionState,intent,[]));
   }
 
   async function commitAction(action){
     if(!state.accepting)return;
-    state.accepting=false;if(state.timer)window.clearInterval(state.timer);state.timer=null;
+    state.accepting=false;
+    if(state.timer)window.clearInterval(state.timer);state.timer=null;
     var elapsed=(performance.now()-state.startedAt)/1000;
     var evaluation=Rules.evaluateActionObject(state.decisionState,action);
     var selected=evaluation.selected,best=evaluation.best,classification=selected.classification;
     var points=Logic.pointsForOutcome(elapsed,classification,state.streak);
 
-    el.triggerState.textContent="VALINTA";el.triggerText.textContent=Rules.describeAction(action);
+    el.triggerState.textContent="VALINTA";
+    el.triggerText.textContent=Rules.describeAction(action);
+    await wait(CUE_MS);
     await animateAction(action);
     applyActionToDisplay(action);
     await wait(STEP_PAUSE_MS);
 
     state.times.push(elapsed);state.counts[classification]+=1;state.score+=points;
-    if(classification==="BEST"||classification==="GOOD"){state.streak+=1;state.bestStreak=Math.max(state.bestStreak,state.streak);}
-    else state.streak=0;
+    if(classification==="BEST"||classification==="GOOD"){
+      state.streak+=1;state.bestStreak=Math.max(state.bestStreak,state.streak);
+    }else state.streak=0;
     updateHud();
-    saveAttempt({category:state.puzzle.category,classification:classification,responseTime:elapsed,selectedAction:action.id||action.type,bestAction:best?best.action.id:null,mistakeType:Rules.mistakeType(state.decisionState,selected,best),at:Date.now()});
 
-    var continuation=(classification==="BEST"||classification==="GOOD")?Rules.nextDecisionState(state.decisionState,action):null;
+    saveAttempt({
+      category:state.puzzle.category,classification:classification,responseTime:elapsed,
+      selectedAction:action.id||action.type,bestAction:best?best.action.id:null,
+      mistakeType:Rules.mistakeType(state.decisionState,selected,best),at:Date.now()
+    });
+
+    var continuation=(classification==="BEST"||classification==="GOOD")
+      ?Rules.nextDecisionState(state.decisionState,action)
+      :null;
+
     if(continuation){
-      state.decisionState=continuation.state;state.decisionLabel=continuation.decisionLabel;state.teachingPoint=continuation.teachingPoint;
-      el.triggerState.textContent="OIKEIN";el.triggerState.classList.add("live");
-      el.triggerText.textContent="Hyvä. Possession jatkuu.";
-      el.possessionStatus.textContent="✓ "+Rules.describeAction(action)+" · seuraava read";
+      el.triggerState.textContent="OIKEIN";
+      el.triggerText.textContent="Hyvä read. Possession jatkuu.";
+      el.possessionStatus.textContent="✓ "+Rules.describeAction(action)+" · seuraava tilanne rakentuu";
       el.possessionStatus.classList.remove("hidden");
-      await wait(520);
+
+      var transitions=continuation.transitionEvents||[];
+      for(var i=0;i<transitions.length;i++){
+        await wait(STEP_PAUSE_MS);
+        await animateEvent(transitions[i],"JATKO "+(i+1)+"/"+transitions.length);
+        state.displayState=Generator.applyEvent(state.displayState,transitions[i]);
+        updateCourt();
+      }
+
+      state.decisionState=continuation.state;
+      state.decisionLabel=continuation.decisionLabel;
+      state.teachingPoint=continuation.teachingPoint;
+      await wait(CONTINUE_PAUSE_MS);
       beginDecision();
       return;
     }
 
-    if(selectedMode==="practice"&&(classification==="ACCEPTABLE"||classification==="POOR"||classification==="WRONG"))scheduleReview(state.puzzle.category);
+    if(selectedMode==="practice"&&(classification==="ACCEPTABLE"||classification==="POOR"||classification==="WRONG")){
+      scheduleReview(state.puzzle.category);
+    }
+
     if(classification!=="BEST"&&best){
       el.triggerState.textContent="PARAS READ";el.triggerText.textContent=Rules.describeAction(best.action);
-      await wait(520);
+      await wait(CONTINUE_PAUSE_MS);
       state.displayState=Generator.clone(state.decisionState);updateCourt();
+      await wait(CUE_MS);
       await animateAction(best.action);
       await wait(STEP_PAUSE_MS);
     }
@@ -298,7 +338,7 @@
 
   async function animateAction(action){
     if(action.type==="SEQUENCE"){
-      for(var i=0;i<action.steps.length;i++){await animateAction(action.steps[i]);await wait(180);}return;
+      for(var i=0;i<action.steps.length;i++){await animateAction(action.steps[i]);await wait(STEP_PAUSE_MS);}return;
     }
     if(action.type==="PASS"){
       focusPlayer(action.player);focusPlayer(action.targetPlayer);
@@ -307,22 +347,39 @@
       await wait(ACTION_MS);clearEventFocus();return;
     }
     if(action.type==="CUT"||action.type==="FILL"){
-      focusPlayer(action.player);await animatePlayerPath(action.player,(action.path&&action.path.length?action.path:[action.targetLocation]),ACTION_MS);clearEventFocus();return;
+      focusPlayer(action.player);
+      await animatePlayerPath(action.player,(action.path&&action.path.length?action.path:[action.targetLocation]),ACTION_MS);
+      clearEventFocus();return;
     }
-    if(action.type==="SCREEN"){focusPlayer(action.player);focusPlayer(action.targetPlayer);await animateScreen(action.player,action.targetPlayer,ACTION_MS);clearEventFocus();return;}
+    if(action.type==="SCREEN"){
+      focusPlayer(action.player);focusPlayer(action.targetPlayer);
+      await animateScreen(action.player,action.targetPlayer,ACTION_MS);
+      clearEventFocus();return;
+    }
     if(action.type==="DRIVE"){
-      focusPlayer(action.player);var node=playerNode(action.player);if(node){setTransition(node,ACTION_MS);node.style.left=SPOTS.RIM.x+"%";node.style.top=(SPOTS.RIM.y+7)+"%";}
-      moveBallToPoint({x:SPOTS.RIM.x,y:SPOTS.RIM.y+7},ACTION_MS);await wait(ACTION_MS);clearEventFocus();return;
+      focusPlayer(action.player);
+      var node=playerNode(action.player);
+      if(node){setTransition(node,ACTION_MS);node.style.left=SPOTS.RIM.x+"%";node.style.top=(SPOTS.RIM.y+7)+"%";}
+      moveBallToPoint({x:SPOTS.RIM.x,y:SPOTS.RIM.y+7},ACTION_MS);
+      await wait(ACTION_MS);clearEventFocus();return;
     }
-    if(action.type==="SHOOT"){focusPlayer(action.player);moveBallToPoint(SPOTS.RIM,ACTION_MS);await wait(ACTION_MS);clearEventFocus();}
+    if(action.type==="SHOOT"){
+      focusPlayer(action.player);moveBallToPoint(SPOTS.RIM,ACTION_MS);
+      await wait(ACTION_MS);clearEventFocus();
+    }
   }
 
   function applyActionToDisplay(action){
     if(action.type==="PASS"){
-      var target=state.displayState.offense[action.targetPlayer];state.displayState.ballHandler=action.targetPlayer;if(target)state.displayState.ballLocation=target.location;
+      var target=state.displayState.offense[action.targetPlayer];
+      state.displayState.ballHandler=action.targetPlayer;
+      if(target)state.displayState.ballLocation=target.location;
     }else if(action.type==="CUT"||action.type==="FILL"){
       if(state.displayState.offense[action.player])state.displayState.offense[action.player].location=action.targetLocation;
       if(state.displayState.ballHandler===action.player)state.displayState.ballLocation=action.targetLocation;
+    }else if(action.type==="SCREEN"){
+      var screened=state.displayState.offense[action.targetPlayer];
+      if(screened&&state.displayState.offense[action.player])state.displayState.offense[action.player].location=screened.location;
     }else if(action.type==="DRIVE"){
       if(state.displayState.offense[action.player])state.displayState.offense[action.player].location="RIM";
       state.displayState.ballHandler=action.player;state.displayState.ballLocation="RIM";
@@ -332,33 +389,63 @@
   function updateCourt(){
     var s=state.displayState;
     Object.keys(s.offense).forEach(function(id){
-      var node=playerNode(id),point=SPOTS[s.offense[id].location];if(!node||!point)return;
-      setTransition(node,ACTION_MS);node.style.left=point.x+"%";node.style.top=point.y+"%";
+      var node=playerNode(id),point=displayPointForPlayer(s,id);
+      if(!node||!point)return;
+      setTransition(node,ACTION_MS);
+      node.style.left=point.x+"%";node.style.top=point.y+"%";
       node.classList.toggle("decision",state.accepting&&id===state.decisionState.decisionPlayer);
       node.classList.toggle("ballhandler",id===s.ballHandler);
       node.querySelector("small").textContent=(state.accepting&&id===state.decisionState.decisionPlayer?"SINÄ · ":"")+ROLES[id];
     });
+
     Object.keys(s.defense).forEach(function(id){
-      var node=el.defenseLayer.querySelector('[data-defender="'+id+'"]'),pos=defenderPosition(s,id);if(!node||!pos)return;
-      node.style.left=pos.x+"%";node.style.top=pos.y+"%";var label=defenderLabel(s.defense[id]);
+      var node=el.defenseLayer.querySelector('[data-defender="'+id+'"]'),pos=defenderPosition(s,id);
+      if(!node||!pos)return;
+      setTransition(node,ACTION_MS);
+      node.style.left=pos.x+"%";node.style.top=pos.y+"%";
+      var label=defenderLabel(s.defense[id],s);
       node.querySelector("small").textContent=label;node.classList.toggle("read",label!=="");
     });
-    var ballPoint=SPOTS[s.ballLocation];if(ballPoint)moveBallToPoint(ballPoint,ACTION_MS);
+
+    var ballPoint=SPOTS[s.ballLocation];
+    if(ballPoint)moveBallToPoint(ballPoint,ACTION_MS);
+  }
+
+  function displayPointForPlayer(s,id){
+    var player=s.offense[id],base=player&&SPOTS[player.location];
+    if(!base)return null;
+    var point={x:base.x,y:base.y},ctx=s.context||{},screenContext=ctx.offBallScreen||null;
+    if(screenContext&&id===screenContext.screener){
+      var cutter=s.offense[screenContext.cutter];
+      if(cutter&&cutter.location===player.location){
+        point.x+=point.x<50?5:-5;point.y+=4;
+      }
+    }
+    if(ctx.secondCut&&id===ctx.secondCut.screener){
+      var secondCutter=s.offense[ctx.secondCut.cutter];
+      if(secondCutter&&secondCutter.location===player.location){
+        point.x+=point.x<50?5:-5;point.y+=4;
+      }
+    }
+    return point;
   }
 
   function defenderPosition(s,id){
-    var d=s.defense[id],guarded=s.offense[d.guarding];if(!guarded||!SPOTS[guarded.location])return null;
+    var d=s.defense[id],guarded=s.offense[d.guarding];
+    if(!guarded||!SPOTS[guarded.location])return null;
     var p=SPOTS[guarded.location],towardX=(50-p.x)*.12,towardY=(11-p.y)*.08;
-    if(d.denyLevel==="HARD"){towardX*=.3;towardY*=1.7;}if(d.helpPosition==="GAP"||d.helpPosition==="NAIL"){towardX*=2.3;towardY*=1.4;}
+    if(d.denyLevel==="HARD"){towardX*=.3;towardY*=1.7;}
+    if(d.helpPosition==="GAP"||d.helpPosition==="NAIL"){towardX*=2.3;towardY*=1.4;}
     return{x:p.x+towardX,y:p.y+towardY};
   }
 
-  function defenderLabel(d){
+  function defenderLabel(d,s){
     if(d.overplay==="TOP_LOCK"||d.denyLevel==="HARD")return"DENY";
     if(d.screenCoverage==="UNDER")return"UNDER";
     if(d.screenCoverage==="HEDGE"||d.screenCoverage==="SHOW")return d.screenCoverage;
-    if(d.screenCoverage==="TRAIL"&&state.puzzle&&state.puzzle.category.indexOf("READ")>=0)return"TRAIL";
-    if(d.helpPosition==="TAGGING_ROLLER")return"TAG";return"";
+    if(d.screenCoverage==="TRAIL"&&s.context&&s.context.offBallScreen)return"TRAIL";
+    if(d.helpPosition==="TAGGING_ROLLER")return"TAG";
+    return"";
   }
 
   function defenseReadText(s){
@@ -369,6 +456,7 @@
     if(s.context.ballScreenRead){var rd=Rules.getDefender(s,s.context.ballScreenRead.roller);return"Big: "+(rd.screenCoverage||"NORMAL");}
     if(s.context.postEntry){var pd=Rules.getDefender(s,s.context.postEntry.postPlayer);return"Post defense: "+(pd.postDefense||"NORMAL");}
     if(s.context.splitScreen)return"Pallo postissa · split action";
+    if(s.context.secondCut)return"Read opposite · second cut";
     return"";
   }
 
@@ -378,14 +466,20 @@
   function focusPlayer(id){var n=playerNode(id);if(n)n.classList.add("event-focus","step-pulse");}
   function clearEventFocus(){document.querySelectorAll(".player").forEach(function(n){n.classList.remove("event-focus","step-pulse");});}
 
-  function markPlayerTargets(){document.querySelectorAll(".player").forEach(function(n){if(n.dataset.player!==state.decisionState.decisionPlayer)n.classList.add("gesture-target");});}
+  function markPlayerTargets(){
+    document.querySelectorAll(".player").forEach(function(n){
+      if(n.dataset.player!==state.decisionState.decisionPlayer)n.classList.add("gesture-target");
+    });
+  }
   function markMoveTargets(){document.querySelectorAll(".spot").forEach(function(n){n.classList.add("target-mode");});markPlayerTargets();}
+
   function clearInteraction(){
     state.gestureMode=null;clearPressTimer();el.intentMenu.classList.add("hidden");el.cancelIntentBtn.classList.add("hidden");
     document.querySelectorAll(".player").forEach(function(n){n.classList.remove("gesture-target","holding","screen-link");});
     document.querySelectorAll(".spot").forEach(function(n){n.classList.remove("target-mode","best-target","selected-target");});
     el.tapMarker.classList.add("hidden");
   }
+
   function cancelIntent(){
     state.gestureMode=null;el.intentMenu.classList.add("hidden");el.cancelIntentBtn.classList.add("hidden");
     document.querySelectorAll(".player").forEach(function(n){n.classList.remove("gesture-target");});
@@ -394,11 +488,26 @@
   }
 
   function nearestSpot(x,y){
-    var best=null,bestDistance=Infinity;Object.keys(SPOTS).forEach(function(name){var p=SPOTS[name],dx=p.x-x,dy=p.y-y,d=dx*dx+dy*dy;if(d<bestDistance){bestDistance=d;best=name;}});
+    var best=null,bestDistance=Infinity;
+    Object.keys(SPOTS).forEach(function(name){
+      var p=SPOTS[name],dx=p.x-x,dy=p.y-y,d=dx*dx+dy*dy;
+      if(d<bestDistance){bestDistance=d;best=name;}
+    });
     return best;
   }
-  function showTapMarker(x,y){el.tapMarker.style.left=x+"%";el.tapMarker.style.top=y+"%";el.tapMarker.classList.remove("hidden");window.setTimeout(function(){el.tapMarker.classList.add("hidden");},500);}
-  function buildSpots(){Object.keys(SPOTS).forEach(function(name){var p=SPOTS[name],spot=document.createElement("button");spot.type="button";spot.className="spot";spot.dataset.spot=name;spot.style.left=p.x+"%";spot.style.top=p.y+"%";spot.tabIndex=-1;el.spotsLayer.appendChild(spot);});}
+
+  function showTapMarker(x,y){
+    el.tapMarker.style.left=x+"%";el.tapMarker.style.top=y+"%";el.tapMarker.classList.remove("hidden");
+    window.setTimeout(function(){el.tapMarker.classList.add("hidden");},500);
+  }
+
+  function buildSpots(){
+    Object.keys(SPOTS).forEach(function(name){
+      var p=SPOTS[name],spot=document.createElement("button");
+      spot.type="button";spot.className="spot";spot.dataset.spot=name;
+      spot.style.left=p.x+"%";spot.style.top=p.y+"%";spot.tabIndex=-1;el.spotsLayer.appendChild(spot);
+    });
+  }
 
   function openFeedback(classification,points,elapsed,selected,best){
     el.feedbackSheet.className="feedback-sheet "+classification.toLowerCase();
@@ -419,15 +528,35 @@
     var exists=state.reviewQueue.some(function(item){return item.category===category&&item.dueRound>state.round;});
     if(!exists)state.reviewQueue.push({category:category,dueRound:state.round+3});
   }
-  function dueReview(){if(selectedMode!=="practice")return null;var index=state.reviewQueue.findIndex(function(item){return item.dueRound<=state.round+1;});if(index<0)return null;return state.reviewQueue.splice(index,1)[0];}
-  function saveAttempt(attempt){try{var key="ppstats-motion-attempts-v2",items=JSON.parse(localStorage.getItem(key)||"[]");items.push(attempt);if(items.length>200)items=items.slice(items.length-200);localStorage.setItem(key,JSON.stringify(items));}catch(e){}}
+
+  function dueReview(){
+    if(selectedMode!=="practice")return null;
+    var index=state.reviewQueue.findIndex(function(item){return item.dueRound<=state.round+1;});
+    if(index<0)return null;
+    return state.reviewQueue.splice(index,1)[0];
+  }
+
+  function saveAttempt(attempt){
+    try{
+      var key="ppstats-motion-attempts-v2",items=JSON.parse(localStorage.getItem(key)||"[]");
+      items.push(attempt);if(items.length>200)items=items.slice(items.length-200);
+      localStorage.setItem(key,JSON.stringify(items));
+    }catch(e){}
+  }
 
   function finishChallenge(){
-    closeFeedback();clearTimers();clearInteraction();el.playScreen.classList.add("hidden");el.resultsScreen.classList.remove("hidden");
-    el.resultScore.textContent=state.score;el.resultBestReads.textContent=state.counts.BEST;el.resultGood.textContent=state.counts.GOOD;el.resultAcceptable.textContent=state.counts.ACCEPTABLE;
-    el.resultMisses.textContent=state.counts.POOR+state.counts.WRONG;el.resultAvg.textContent=Logic.average(state.times).toFixed(2)+" s";el.resultStreak.textContent=state.bestStreak;
+    closeFeedback();clearTimers();clearInteraction();
+    el.playScreen.classList.add("hidden");el.resultsScreen.classList.remove("hidden");
+    el.resultScore.textContent=state.score;el.resultBestReads.textContent=state.counts.BEST;el.resultGood.textContent=state.counts.GOOD;
+    el.resultAcceptable.textContent=state.counts.ACCEPTABLE;el.resultMisses.textContent=state.counts.POOR+state.counts.WRONG;
+    el.resultAvg.textContent=Logic.average(state.times).toFixed(2)+" s";el.resultStreak.textContent=state.bestStreak;
   }
-  function returnToSetup(){state.roundToken+=1;closeFeedback();clearTimers();clearInteraction();state.accepting=false;el.playScreen.classList.add("hidden");el.resultsScreen.classList.add("hidden");el.setupScreen.classList.remove("hidden");}
+
+  function returnToSetup(){
+    state.roundToken+=1;closeFeedback();clearTimers();clearInteraction();state.accepting=false;
+    el.playScreen.classList.add("hidden");el.resultsScreen.classList.add("hidden");el.setupScreen.classList.remove("hidden");
+  }
+
   function closeFeedback(){el.feedbackBackdrop.classList.add("hidden");el.feedbackSheet.classList.add("hidden");}
   function vibrate(pattern){if(navigator.vibrate)navigator.vibrate(pattern);}
   function wait(ms){return new Promise(function(resolve){window.setTimeout(resolve,ms);});}
