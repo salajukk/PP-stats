@@ -58,12 +58,9 @@ test('hedge/show ball screen creates roller pass priority',()=>{
   assert.equal(best.targetPlayer,'P5');
 });
 
-test('compound decision supports pass-screen-slip sequence',()=>{
-  const p=puzzle('POST_SPLIT_SEQUENCE','3',3);
-  const best=p.rankedSolutions[0].action;
-  assert.equal(best.type,'SEQUENCE');
-  assert.equal(best.steps.length,3);
-  assert.deepEqual(best.steps.map(s=>s.type),['PASS','SCREEN','CUT']);
+test('legacy all-at-once post split puzzle is no longer generated',()=>{
+  assert.ok(!Templates.CATEGORIES.includes('POST_SPLIT_SEQUENCE'));
+  assert.ok(!Templates.DEFINITIONS.some(d=>d.category==='POST_SPLIT_SEQUENCE'));
 });
 
 test('templates do not encode correctAction or rankedSolutions',()=>{
@@ -117,25 +114,6 @@ test('mobile UI keeps touch targets and defender styling',()=>{
   assert.match(css,/min-height:44px/);
   assert.match(css,/\.defender/);
   assert.match(css,/safe-area-inset-bottom/);
-});
-
-test('gesture inference maps movement to tactical actions and supports sequence prefixes',()=>{
-  const p=puzzle('POST_SPLIT_SEQUENCE','3',3);
-  const first=Rules.inferGestureAction(p.decisionState,{type:'PASS',targetPlayer:'P5'},[]);
-  assert.equal(first.type,'PASS');
-  const seq=p.rankedSolutions.find(x=>x.action.type==='SEQUENCE').action;
-  assert.ok(Rules.sequencePrefixMatches(seq,[first]));
-
-  const second=Rules.inferGestureAction(p.decisionState,{type:'SCREEN',targetPlayer:seq.steps[1].targetPlayer},[first]);
-  assert.equal(second.type,'SCREEN');
-  assert.ok(Rules.sequencePrefixMatches(seq,[first,second]));
-
-  const third=Rules.inferGestureAction(p.decisionState,{type:'MOVE',targetLocation:seq.steps[2].targetLocation},[first,second]);
-  assert.equal(third.type,'CUT');
-  assert.ok(Rules.actionMatches(third,seq.steps[2]));
-
-  const actual=Rules.makeAction('SEQUENCE',p.decisionPlayer,{sequenceId:'USER_GESTURE',steps:[first,second,third]});
-  assert.equal(Rules.evaluateActionObject(p.decisionState,actual).selected.classification,'BEST');
 });
 
 test('post-entry setup is a readable three-step possession before the wing decision',()=>{
