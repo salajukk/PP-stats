@@ -57,6 +57,13 @@
     return{type:"SCREEN",player:player,targetPlayer:targetPlayer,targetLocation:targetLocation,movement:"SCREEN",rule:rule,reason:reason};
   }
 
+  function choiceAction(player,options,rule,reason,meta){
+    return{
+      type:"CHOICE",player:player,options:options.map(clone),rule:rule,reason:reason,
+      meta:meta?clone(meta):{}
+    };
+  }
+
   function confirmAction(reason){
     return{type:"CONFIRM",rule:"SPACING_VALID",reason:reason||"Neljä perimeter-paikkaa ovat jälleen täynnä ilman päällekkäisyyksiä."};
   }
@@ -101,20 +108,34 @@
 
     if(trigger.type==="SLOT_TO_SLOT_PASS"){
       var sourceSide=sideOf(trigger.fromLocation);
-      var destinationSide=sideOf(trigger.toLocation);
       var sameWing=wing(sourceSide);
       var wingPlayer=playerAt(state,sameWing,trigger.passer);
-      reactions.push(move(
-        trigger.passer,sameWing,"EXCHANGE","SLOT_TO_SLOT_EXCHANGE",[sameWing],
-        "Slot → slot -syötön jälkeen syöttäjä exchangeaa saman puolen wingille."
+
+      if(wingPlayer)reactions.push(screenAction(
+        trigger.passer,wingPlayer,sameWing,"SLOT_TO_SLOT_EXCHANGE",
+        "Slot → opposite slot -syötön jälkeen syöttäjä screenaa saman puolen wingin."
       ));
+
       if(wingPlayer)reactions.push(move(
-        wingPlayer,trigger.fromLocation,"EXCHANGE","SLOT_TO_SLOT_EXCHANGE",[trigger.fromLocation],
-        "Wing täyttää syöttäjän vapauttaman slotin ja exchange valmistuu."
+        wingPlayer,trigger.fromLocation,"FILL","SLOT_TO_SLOT_EXCHANGE",[trigger.fromLocation],
+        "Screenin käyttänyt wing täyttää syöttäjän vapauttaman slotin."
       ));
-      if(state.offense.P5)reactions.push(move(
-        "P5",dunker(opposite(destinationSide)),"RELOCATE","P5_WEAK_SIDE_POSITION",[dunker(opposite(destinationSide))],
-        "P5 sijoittuu palloon nähden weak-side dunkeriin."
+
+      reactions.push(choiceAction(
+        trigger.passer,
+        [
+          move(
+            trigger.passer,sameWing,"EXCHANGE","SLOT_TO_SLOT_EXCHANGE",[sameWing],
+            "Screener voi exchange-jatkona täyttää vapautuneen wingin."
+          ),
+          move(
+            trigger.passer,"RIM","SLIP","SLOT_TO_SLOT_EXCHANGE",["RIM"],
+            "Screener voi slipata screenistä suoraan korille."
+          )
+        ],
+        "SLOT_TO_SLOT_EXCHANGE",
+        "Screenin jälkeen screener voi joko exchange/fillata vapaan wingin tai slipata korille.",
+        {fallbackWing:sameWing,ballHandler:trigger.receiver}
       ));
       return reactions;
     }
@@ -261,6 +282,20 @@
       var spacing=validateSpacing(state);
       return{correct:input.type==="CONFIRM"&&spacing.standard4Out,spacing:spacing};
     }
+    if(expected.type==="CHOICE"){
+      if(expected.player!==input.player)return{correct:false};
+      for(var i=0;i<expected.options.length;i++){
+        var option=expected.options[i];
+        if(option.type!==input.type)continue;
+        if(option.type==="MOVE"&&option.targetLocation===input.targetLocation){
+          return{correct:true,selectedOption:clone(option)};
+        }
+        if(option.type==="SCREEN"&&option.targetPlayer===input.targetPlayer){
+          return{correct:true,selectedOption:clone(option)};
+        }
+      }
+      return{correct:false};
+    }
     if(expected.type!==input.type)return{correct:false};
     if(expected.player!==input.player)return{correct:false};
     if(expected.type==="MOVE")return{correct:expected.targetLocation===input.targetLocation};
@@ -295,7 +330,7 @@
 
   function movementLabel(movement){
     var labels={
-      THRU_CUT:"Thru cut",FILL:"Fill",EXCHANGE:"Exchange",RELOCATE:"Relocate",
+      THRU_CUT:"Thru cut",FILL:"Fill",EXCHANGE:"Exchange",SLIP:"Slip",RELOCATE:"Relocate",
       SHAKE:"Shake / lift",ROLL:"Roll",POP:"Pop out",DIVE:"Dive",DRIFT:"Drift",SPACE:"Space",LIFT:"Lift"
     };
     return labels[movement]||movement||"Liiku";
@@ -304,6 +339,11 @@
   function describeReaction(reaction){
     if(!reaction)return"";
     if(reaction.type==="CONFIRM")return"Spacing valmis";
+    if(reaction.type==="CHOICE"){
+      return reaction.player+": "+reaction.options.map(function(option){
+        return movementLabel(option.movement)+" → "+describeLocation(option.targetLocation);
+      }).join(" TAI ");
+    }
     if(reaction.type==="SCREEN")return reaction.player+" → screen "+reaction.targetPlayer;
     return reaction.player+": "+movementLabel(reaction.movement)+" → "+describeLocation(reaction.targetLocation);
   }
@@ -324,6 +364,7 @@
     opposite:opposite,
     playerAt:playerAt,
     actionKey:actionKey,
+    choiceAction:choiceAction,
     getRequiredReactions:getRequiredReactions,
     applyReaction:applyReaction,
     reactionToEvent:reactionToEvent,

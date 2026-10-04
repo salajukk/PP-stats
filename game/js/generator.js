@@ -125,6 +125,45 @@
     return puzzle;
   }
 
+  function resolveChoiceOutcome(state,choice,selectedOption,randomFn){
+    randomFn=randomFn||Math.random;
+    if(!choice||choice.type!=="CHOICE"||!selectedOption)return{events:[],reactions:[],outcome:"NONE"};
+    if(selectedOption.movement!=="SLIP")return{events:[],reactions:[],outcome:"EXCHANGE"};
+
+    var getsPass=randomFn()<0.35;
+    if(getsPass){
+      return{
+        outcome:"SLIP_PASS",
+        events:[{
+          type:"PASS",
+          fromPlayer:state.ballHandler,
+          toPlayer:selectedOption.player,
+          label:"Slip aukeaa — pallo syötetään "+selectedOption.player+":lle",
+          duration:1050
+        }],
+        reactions:[]
+      };
+    }
+
+    return{
+      outcome:"SLIP_NO_PASS",
+      events:[{
+        type:"WAIT",
+        label:"Slip ei saa palloa — vapaa wing pitää vielä täyttää",
+        duration:900
+      }],
+      reactions:[{
+        type:"MOVE",
+        player:selectedOption.player,
+        targetLocation:choice.meta&&choice.meta.fallbackWing,
+        movement:"FILL",
+        rule:"SLOT_TO_SLOT_EXCHANGE",
+        path:[choice.meta&&choice.meta.fallbackWing],
+        reason:"Kun slip ei saa palloa, screener poistuu paintista ja täyttää vapaan wingin."
+      }]
+    };
+  }
+
   function generateQueue(count,options){
     var result=[],previous=null;
     options=options||{};
@@ -146,6 +185,7 @@
     weightedDefinitions:weightedDefinitions,
     buildPuzzle:buildPuzzle,
     generatePuzzle:generatePuzzle,
+    resolveChoiceOutcome:resolveChoiceOutcome,
     generateQueue:generateQueue
   };
 });

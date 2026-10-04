@@ -162,8 +162,11 @@
       el.gestureStatus.textContent="Tarkista neljä perimeter-paikkaa ja vahvista.";
       el.confirmSpacingBtn.classList.remove("hidden");
     }else if(expected.type==="SCREEN"){
-      el.gestureStatus.textContent="Napauta pelaajaa, jolle P5:n pitää mennä screeniin.";
+      el.gestureStatus.textContent="Napauta pelaajaa, jolle "+expected.player+" menee screeniin.";
       markPlayerTargets(expected.player);
+    }else if(expected.type==="CHOICE"){
+      el.gestureStatus.textContent="Screenin jälkeen valitse oma jatko: exchange/fill tai slip korille.";
+      markSpotTargets();
     }else{
       el.gestureStatus.textContent="Napauta kentältä tila, johon "+expected.player+" kuuluu seuraavaksi.";
       markSpotTargets();
@@ -177,6 +180,7 @@
   function decisionQuestion(expected){
     if(expected.type==="CONFIRM")return"Tunnista valmis uusi spacing.";
     if(expected.type==="SCREEN")return"Mihin "+expected.player+" liikkuu?";
+    if(expected.type==="CHOICE")return"Miten "+expected.player+" jatkaa screenin jälkeen?";
     return"Mihin "+expected.player+" liikkuu seuraavaksi?";
   }
 
@@ -298,6 +302,7 @@
     var elapsed=(performance.now()-state.startedAt)/1000;
     var result=Rules.evaluateInput(expected,input,state.currentState);
     var correct=result.correct;
+    var resolvedReaction=result.selectedOption||expected;
     var points=Logic.pointsForAnswer(elapsed,correct,state.streak);
 
     state.times.push(elapsed);
@@ -315,10 +320,36 @@
 
     if(correct){
       el.triggerState.textContent="OIKEIN";
-      el.triggerText.textContent=Rules.describeReaction(expected);
+      el.triggerText.textContent=Rules.describeReaction(resolvedReaction);
       await wait(CUE_MS);
-      await animateReaction(expected);
-      state.currentState=Rules.applyReaction(state.currentState,expected);
+      await animateReaction(resolvedReaction);
+      state.currentState=Rules.applyReaction(state.currentState,resolvedReaction);
+
+      var branch=expected.type==="CHOICE"
+        ?Generator.resolveChoiceOutcome(state.currentState,expected,resolvedReaction,Math.random)
+        :null;
+
+      if(branch){
+        for(var b=0;b<branch.events.length;b++){
+          await wait(SETTLE_MS);
+          await animateEvent(branch.events[b],"JATKO");
+          state.currentState=Generator.applyEvent(state.currentState,branch.events[b]);
+          updateCourt();
+        }
+        if(branch.reactions.length){
+          var insertAt=state.reactionIndex+1;
+          var args=[insertAt,0].concat(branch.reactions);
+          Array.prototype.splice.apply(state.reactions,args);
+        }
+        if(branch.outcome==="SLIP_PASS"){
+          el.possessionStatus.textContent="Slip sai pallon · possession jatkuu uudesta tilanteesta.";
+          el.possessionStatus.classList.remove("hidden");
+        }else if(branch.outcome==="SLIP_NO_PASS"){
+          el.possessionStatus.textContent="Slip ei saanut palloa · täytä vapaa wing.";
+          el.possessionStatus.classList.remove("hidden");
+        }
+      }
+
       state.reactionIndex++;
       updateCourt();
       await wait(CONTINUE_MS);
@@ -326,7 +357,7 @@
       if(state.reactionIndex<state.reactions.length){
         beginDecision();
       }else{
-        finishPuzzle(true,elapsed,{input:input,expected:expected,points:points});
+        finishPuzzle(true,elapsed,{input:input,expected:resolvedReaction,points:points});
       }
       return;
     }
@@ -338,10 +369,11 @@
     await wait(450);
 
     el.triggerState.textContent="OIKEA LIIKE";
-    el.triggerText.textContent=Rules.describeReaction(expected);
+    var correction=expected.type==="CHOICE"?expected.options[0]:expected;
+    el.triggerText.textContent=Rules.describeReaction(correction);
     await wait(CUE_MS);
-    await animateReaction(expected);
-    state.currentState=Rules.applyReaction(state.currentState,expected);
+    await animateReaction(correction);
+    state.currentState=Rules.applyReaction(state.currentState,correction);
     state.reactionIndex++;
     updateCourt();
     await wait(SETTLE_MS);

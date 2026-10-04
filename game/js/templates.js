@@ -108,6 +108,25 @@
     };
   }
 
+  function p5WeakSideTemplate(random){
+    var side=choose(random,["LEFT","RIGHT"]);
+    var s=sideData(side);
+    var state=baseState(s.wingPlayer);
+    return{
+      category:"P5_WEAK_SIDE",
+      initialState:state,
+      prelude:[
+        event("PASS",{fromPlayer:s.wingPlayer,toPlayer:s.oppositeSlotPlayer},
+          s.wingPlayer+" syöttää pallon vastakkaiseen slottiin")
+      ],
+      trigger:{
+        type:"BALL_TO_SLOT",
+        ballLocation:s.oppositeSlot
+      },
+      startReaction:0
+    };
+  }
+
   function ballScreenTemplate(random,category,startReaction){
     var side=choose(random,["LEFT","RIGHT"]);
     var s=sideData(side);
@@ -205,7 +224,7 @@
     {category:"COMPLETED_ROTATION",weight:1,build:function(r){return slotWingTemplate(r,"COMPLETED_ROTATION",4,true);}},
     {category:"SLOT_EXCHANGE",weight:4,build:function(r){return slotExchangeTemplate(r,"SLOT_EXCHANGE",0);}},
     {category:"EXCHANGE_PARTNER",weight:2,build:function(r){return slotExchangeTemplate(r,"EXCHANGE_PARTNER",1);}},
-    {category:"P5_WEAK_SIDE",weight:2,build:function(r){return slotExchangeTemplate(r,"P5_WEAK_SIDE",2);}},
+    {category:"P5_WEAK_SIDE",weight:2,build:p5WeakSideTemplate},
     {category:"P5_WING_REACTION",weight:3,build:function(r){return slotWingTemplate(r,"P5_WING_REACTION",3,false);}},
     {category:"BALL_SCREEN",weight:4,build:function(r){return ballScreenTemplate(r,"BALL_SCREEN",0);}},
     {category:"SHAKE",weight:3,build:function(r){return ballScreenTemplate(r,"SHAKE",1);}},

@@ -76,17 +76,60 @@ test('completed rotation asks for spacing confirmation after applying all reacti
   assert.equal(Rules.evaluateInput(p.reactionQueue[0],{type:'CONFIRM'},p.decisionState).correct,true);
 });
 
-test('slot-to-slot pass creates exchange pair and P5 weak-side relocation',()=>{
+test('slot-to-slot pass creates screen, wing fill and legal exchange-or-slip choice',()=>{
   const p=puzzle('SLOT_EXCHANGE');
   assert.equal(p.allReactions.length,3);
-  assert.equal(p.allReactions[0].movement,'EXCHANGE');
-  assert.equal(p.allReactions[1].movement,'EXCHANGE');
-  assert.equal(p.allReactions[2].rule,'P5_WEAK_SIDE_POSITION');
+  assert.equal(p.allReactions[0].type,'SCREEN');
+  assert.equal(p.allReactions[0].rule,'SLOT_TO_SLOT_EXCHANGE');
+  assert.equal(p.allReactions[1].movement,'FILL');
+  assert.equal(p.allReactions[2].type,'CHOICE');
+  assert.deepEqual(p.allReactions[2].options.map(o=>o.movement),['EXCHANGE','SLIP']);
 });
 
-test('P5 weak-side standalone stage is derived from slot exchange trigger',()=>{
+test('both exchange and slip are accepted for the slot-to-slot screener decision',()=>{
+  const p=puzzle('SLOT_EXCHANGE');
+  const choice=p.allReactions[2];
+  const exchange=choice.options.find(o=>o.movement==='EXCHANGE');
+  const slip=choice.options.find(o=>o.movement==='SLIP');
+  assert.equal(Rules.evaluateInput(choice,{type:'MOVE',player:choice.player,targetLocation:exchange.targetLocation},p.decisionState).correct,true);
+  assert.equal(Rules.evaluateInput(choice,{type:'MOVE',player:choice.player,targetLocation:slip.targetLocation},p.decisionState).correct,true);
+});
+
+test('slip outcome is randomized only after player chooses slip',()=>{
+  const p=puzzle('SLOT_EXCHANGE');
+  const choice=p.allReactions[2];
+  const slip=choice.options.find(o=>o.movement==='SLIP');
+  let state=Generator.clone(p.decisionState);
+  state=Rules.applyReaction(state,p.allReactions[0]);
+  state=Rules.applyReaction(state,p.allReactions[1]);
+  state=Rules.applyReaction(state,slip);
+
+  const getsPass=Generator.resolveChoiceOutcome(state,choice,slip,()=>0.1);
+  assert.equal(getsPass.outcome,'SLIP_PASS');
+  assert.equal(getsPass.events[0].type,'PASS');
+  assert.equal(getsPass.reactions.length,0);
+
+  const noPass=Generator.resolveChoiceOutcome(state,choice,slip,()=>0.9);
+  assert.equal(noPass.outcome,'SLIP_NO_PASS');
+  assert.equal(noPass.events[0].type,'WAIT');
+  assert.equal(noPass.reactions[0].movement,'FILL');
+  assert.equal(noPass.reactions[0].targetLocation,choice.meta.fallbackWing);
+});
+
+test('exchange choice does not invoke a random follow-up event',()=>{
+  const p=puzzle('SLOT_EXCHANGE');
+  const choice=p.allReactions[2];
+  const exchange=choice.options.find(o=>o.movement==='EXCHANGE');
+  const outcome=Generator.resolveChoiceOutcome(p.decisionState,choice,exchange,()=>0.1);
+  assert.equal(outcome.outcome,'EXCHANGE');
+  assert.equal(outcome.events.length,0);
+  assert.equal(outcome.reactions.length,0);
+});
+
+test('P5 weak-side standalone stage uses a direct ball-to-slot trigger',()=>{
   const p=puzzle('P5_WEAK_SIDE');
   assert.equal(p.reactionQueue.length,1);
+  assert.equal(p.trigger.type,'BALL_TO_SLOT');
   assert.equal(p.reactionQueue[0].player,'P5');
   assert.equal(p.reactionQueue[0].rule,'P5_WEAK_SIDE_POSITION');
 });
@@ -150,6 +193,7 @@ test('game interaction is direct court movement without action menu or defense U
   assert.doesNotMatch(html,/intentMenu|data-intent|defensePrompt|defenseLayer/);
   assert.match(game,/submitInput\(\{type:"MOVE"/);
   assert.match(game,/submitInput\(\{type:"SCREEN"/);
+  assert.match(game,/Generator\.resolveChoiceOutcome/);
   assert.match(html,/confirmSpacingBtn/);
 });
 
