@@ -75,6 +75,17 @@ test('off-ball screen reads change with defender behavior',()=>{
   assert.equal(puzzle('BACKDOOR_READ','3').rankedSolutions[0].action.cutType,'BACKDOOR');
 });
 
+test('pop/straight can be selected by moving to the player current semantic spot',()=>{
+  const p=puzzle('POP_READ','4');
+  const player=p.decisionState.decisionPlayer;
+  const ownLocation=p.decisionState.offense[player].location;
+  const action=Rules.inferGestureAction(p.decisionState,{type:'MOVE',targetLocation:ownLocation},[]);
+  assert.equal(action.type,'CUT');
+  assert.equal(action.cutType,'STRAIGHT');
+  assert.equal(action.targetLocation,ownLocation);
+  assert.equal(Rules.evaluateActionObject(p.decisionState,action).selected.classification,'BEST');
+});
+
 test('correct screen read creates a second-cut decision',()=>{
   const p=puzzle('CURL_READ','3');
   const best=p.rankedSolutions[0].action;
@@ -151,6 +162,9 @@ test('gesture UI stays field-driven and arrow-free',()=>{
   assert.match(js,/LONG_PRESS_MS/);
   assert.match(js,/handleCourtPointerUp/);
   assert.match(js,/nearestSpot/);
+  assert.match(js,/ownLocation.*commitIntent/s);
+  assert.match(js,/animatePop/);
+  assert.match(js,/oma pelaaja = pop\/straight/);
 });
 
 test('runtime stores attempts and schedules spaced repetition',()=>{

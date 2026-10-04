@@ -166,6 +166,26 @@
     setTransition(node,ACTION_MS);
   }
 
+  async function animatePop(playerId,location,duration){
+    var node=playerNode(playerId),base=SPOTS[location];
+    if(!node||!base){await wait(duration);return;}
+    var rim=SPOTS.RIM,dx=base.x-rim.x,dy=base.y-rim.y;
+    var length=Math.sqrt(dx*dx+dy*dy)||1;
+    var offset=8;
+    var popPoint={
+      x:Math.max(6,Math.min(94,base.x+dx/length*offset)),
+      y:Math.max(14,Math.min(90,base.y+dy/length*offset))
+    };
+    var outMs=Math.round(duration*.62),backMs=duration-outMs;
+    setTransition(node,outMs);
+    node.style.left=popPoint.x+"%";node.style.top=popPoint.y+"%";
+    await wait(outMs);
+    setTransition(node,backMs);
+    node.style.left=base.x+"%";node.style.top=base.y+"%";
+    await wait(backMs);
+    setTransition(node,ACTION_MS);
+  }
+
   async function animateScreen(playerId,targetId,duration){
     var screener=playerNode(playerId),target=playerNode(targetId);
     if(!screener||!target){await wait(duration);return;}
@@ -223,7 +243,14 @@
     });
     node.addEventListener("click",function(e){
       e.stopPropagation();
-      if(!state.accepting||!state.gestureMode||id===state.decisionState.decisionPlayer)return;
+      if(!state.accepting||!state.gestureMode)return;
+      if(id===state.decisionState.decisionPlayer){
+        if(state.gestureMode==="MOVE"){
+          var ownLocation=state.decisionState.offense[id]&&state.decisionState.offense[id].location;
+          if(ownLocation)commitIntent({type:"MOVE",targetLocation:ownLocation});
+        }
+        return;
+      }
       if(state.gestureMode==="PASS")commitIntent({type:"PASS",targetPlayer:id});
       else if(state.gestureMode==="MOVE")commitIntent({type:"SCREEN",targetPlayer:id});
     });
@@ -250,7 +277,7 @@
     }
     state.gestureMode=mode;el.cancelIntentBtn.classList.remove("hidden");
     if(mode==="PASS"){el.gestureStatus.textContent="SYÖTTÖ · Napauta joukkuetoveria.";markPlayerTargets();}
-    else{el.gestureStatus.textContent="LIIKE · Napauta tyhjää tilaa. Pelaajaan = screen.";markMoveTargets();}
+    else{el.gestureStatus.textContent="LIIKE · Tyhjä tila = liike · joukkuetoveri = screen · oma pelaaja = pop/straight.";markMoveTargets();}
   }
 
   function handleCourtPointerUp(e){
@@ -348,7 +375,10 @@
     }
     if(action.type==="CUT"||action.type==="FILL"){
       focusPlayer(action.player);
-      await animatePlayerPath(action.player,(action.path&&action.path.length?action.path:[action.targetLocation]),ACTION_MS);
+      var currentLocation=state.displayState.offense[action.player]&&state.displayState.offense[action.player].location;
+      var sameSpotCut=action.type==="CUT"&&(action.cutType==="STRAIGHT"||action.cutType==="POP")&&currentLocation===action.targetLocation;
+      if(sameSpotCut)await animatePop(action.player,action.targetLocation,ACTION_MS);
+      else await animatePlayerPath(action.player,(action.path&&action.path.length?action.path:[action.targetLocation]),ACTION_MS);
       clearEventFocus();return;
     }
     if(action.type==="SCREEN"){
@@ -471,7 +501,17 @@
       if(n.dataset.player!==state.decisionState.decisionPlayer)n.classList.add("gesture-target");
     });
   }
-  function markMoveTargets(){document.querySelectorAll(".spot").forEach(function(n){n.classList.add("target-mode");});markPlayerTargets();}
+  function markMoveTargets(){
+    document.querySelectorAll(".spot").forEach(function(n){n.classList.add("target-mode");});
+    markPlayerTargets();
+    var playerId=state.decisionState.decisionPlayer;
+    var ownLocation=state.decisionState.offense[playerId]&&state.decisionState.offense[playerId].location;
+    var selfMove=Rules.getValidActions(state.decisionState).some(function(action){
+      return(action.type==="CUT"||action.type==="FILL")&&action.targetLocation===ownLocation;
+    });
+    var ownNode=playerNode(playerId);
+    if(selfMove&&ownNode)ownNode.classList.add("gesture-target");
+  }
 
   function clearInteraction(){
     state.gestureMode=null;clearPressTimer();el.intentMenu.classList.add("hidden");el.cancelIntentBtn.classList.add("hidden");
