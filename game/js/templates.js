@@ -8,7 +8,7 @@
 
   var CATEGORIES=[
     "PASS_AND_CUT","FILL","CURL_READ","POP_READ","BACKDOOR_READ",
-    "SCREENER_SECOND_CUT","POST_ENTRY","BALL_SCREEN_ROLLER_READ","POST_SPLIT_SEQUENCE"
+    "SCREENER_SECOND_CUT","POST_ENTRY","BALL_SCREEN_ROLLER_READ"
   ];
 
   function choose(random,items){return items[Math.floor(random()*items.length)];}
@@ -199,20 +199,25 @@
         ballHandler:s.wingPlayer,
         postPlayer:"P5",
         reversalPlayer:s.oppositeSlotPlayer,
+        splitScreenTarget:s.oppositeSlotPlayer,
         sealed:true,
         laneOpen:false
       }
     };
     return{
       category:"POST_ENTRY",difficulty:2,
-      decisionLabel:"Catch-to-score: mikä etu on auki?",
+      decisionLabel:"Wingillä pallo ja 5:llä seal. Mikä on paras read?",
       initialState:state,
       prelude:[
-        event("PASS",{fromPlayer:s.slotPlayer,toPlayer:s.oppositeSlotPlayer},"Slot → opposite slot",500),
-        event("PASS",{fromPlayer:s.oppositeSlotPlayer,toPlayer:s.wingPlayer},"Reversal wingille",520),
-        event("MOVE",{player:"P5",to:s.block},"5 duck-in → ball-side block",620)
+        event("PASS",{fromPlayer:s.slotPlayer,toPlayer:s.wingPlayer},"Slot → wing: pallo liikkuu wingille",620),
+        event("GROUP",{moves:[
+          {player:s.slotPlayer,path:["RIM",s.oppositeWing]},
+          {player:s.oppositeSlotPlayer,to:s.slot},
+          {player:s.oppositeWingPlayer,to:s.oppositeSlot}
+        ]},"Syöttäjä thru-cuttaa, muut täyttävät perimeterin",620),
+        event("MOVE",{player:"P5",to:s.block},"5 duck-in → vahvan puolen block",620)
       ],
-      teachingPoint:"Kun postilla on hyvä seal ja puolustaja jää taakse, post entry ohittaa perus-motionin."
+      teachingPoint:"Kun postilla on hyvä seal ja puolustaja jää taakse, post entry on korkean prioriteetin read. Sen jälkeen syöttäjä jatkaa split-actioniin."
     };
   }
 
@@ -293,8 +298,7 @@
     {category:"BACKDOOR_READ",difficulty:2,supports:supportsWing,build:function(r,role){return buildScreenRead(r,"BACKDOOR_READ","TRAIL",role);}},
     {category:"SCREENER_SECOND_CUT",difficulty:2,supports:supportsCenter,build:buildSecondCut},
     {category:"POST_ENTRY",difficulty:2,supports:supportsWing,build:buildPostEntry},
-    {category:"BALL_SCREEN_ROLLER_READ",difficulty:3,supports:supportsGuard,build:buildBallScreenRoller},
-    {category:"POST_SPLIT_SEQUENCE",difficulty:3,supports:supportsWing,build:buildPostSplitSequence}
+    {category:"BALL_SCREEN_ROLLER_READ",difficulty:3,supports:supportsGuard,build:buildBallScreenRoller}
   ];
 
   function list(options){

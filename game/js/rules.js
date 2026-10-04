@@ -113,6 +113,11 @@
       addAction(map,makeAction("DRIVE",player,{driveType:"REJECT"}));
     }
 
+    if(ctx.splitScreen&&ctx.splitScreen.passer===player){
+      addAction(map,makeAction("SCREEN",player,{targetPlayer:ctx.splitScreen.screenTarget,screenType:"SPLIT"}));
+      addAction(map,makeAction("CUT",player,{cutType:"BASKET",targetLocation:"RIM",path:["RIM"]}));
+    }
+
     if(ctx.postSplit&&ctx.postSplit.passer===player){
       addAction(map,makeAction("SEQUENCE",player,{
         sequenceId:"POST_SPLIT_SLIP",
@@ -248,6 +253,12 @@
       }
     }
 
+    if(ctx.splitScreen&&ctx.splitScreen.passer===action.player){
+      if(action.type==="SCREEN"&&action.targetPlayer===ctx.splitScreen.screenTarget)score=96;
+      if(action.type==="CUT")score=48;
+      if(action.type==="HOLD")score=-100;
+    }
+
     if(ctx.postSplit&&ctx.postSplit.passer===action.player){
       var targetDef=getDefender(state,ctx.postSplit.screenTarget);
       var deny=targetDef.denyLevel==="HARD"||targetDef.overplay==="TOP_LOCK";
@@ -355,6 +366,10 @@
       if(action.type==="PASS"&&action.targetPlayer===ctx.ballScreenRead.shakePlayer)return"Low-man/tagger auttaa rollerille, joten shake/lift-pelaaja vapautuu kick-outiin.";
     }
 
+    if(ctx.splitScreen){
+      return"Post entryn jälkeen syöttäjä ei jää seisomaan. Ensimmäinen split-actionin read on screen lähimmälle slot/perimeter-pelaajalle.";
+    }
+
     if(ctx.postSplit){
       return"Post entryn jälkeen syöttäjä jatkaa motionia: screen lähimmälle perimeter-pelaajalle ja top-lockia vastaan slipataan syntyvään tilaan.";
     }
@@ -376,10 +391,38 @@
     if(ctx.secondCut)return"SCREENER_SECOND_CUT";
     if(ctx.postEntry)return"MISSED_POST_ENTRY";
     if(ctx.ballScreenRead)return"MISSED_PNR_READ";
+    if(ctx.splitScreen)return"MISSED_SPLIT_SCREEN";
     if(ctx.postSplit)return"MISSED_SPLIT_SEQUENCE";
     return best?"LOWER_VALUE_READ":"UNKNOWN";
   }
 
+
+
+  function nextDecisionState(state,action){
+    var ctx=state.context||{};
+    if(ctx.postEntry&&action&&action.type==="PASS"&&action.targetPlayer===ctx.postEntry.postPlayer){
+      var next=clone(state);
+      var passer=state.decisionPlayer;
+      var post=ctx.postEntry.postPlayer;
+      next.ballHandler=post;
+      next.ballLocation=next.offense[post].location;
+      next.decisionPlayer=passer;
+      next.context={
+        splitScreen:{
+          passer:passer,
+          postPlayer:post,
+          screenTarget:ctx.postEntry.splitScreenTarget||nearestOtherPerimeter(next,passer)
+        }
+      };
+      next.history=(next.history||[]).concat([{type:"PASS",fromPlayer:passer,toPlayer:post,label:"Post entry"}]);
+      return{
+        state:next,
+        decisionLabel:"Pallo on postissa. Mitä syöttäjä tekee nyt?",
+        teachingPoint:"Post entryn jälkeen syöttäjä jatkaa: screen lähimmälle perimeter-pelaajalle."
+      };
+    }
+    return null;
+  }
 
   function actionMatches(actual,expected){
     if(!actual||!expected||actual.type!==expected.type)return false;
@@ -466,6 +509,7 @@
     sequencePrefixMatches:sequencePrefixMatches,
     inferGestureAction:inferGestureAction,
     evaluateActionObject:evaluateActionObject,
+    nextDecisionState:nextDecisionState,
     clone:clone,
     getDefender:getDefender
   };

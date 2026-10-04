@@ -106,8 +106,9 @@ test('game page loads rule engine, templates and generator before UI',()=>{
   assert.ok(rules>0&&rules<templates&&templates<generator&&generator<game);
   assert.match(html,/id="defenseLayer"/);
   assert.match(html,/id="intentMenu"/);
-  assert.match(html,/id="eventPath"/);
-  assert.match(html,/id="choicePath"/);
+  assert.doesNotMatch(html,/id="eventPath"/);
+  assert.doesNotMatch(html,/id="choicePath"/);
+  assert.doesNotMatch(html,/id="answerArrow"/);
 });
 
 test('mobile UI keeps touch targets and defender styling',()=>{
@@ -137,6 +138,32 @@ test('gesture inference maps movement to tactical actions and supports sequence 
   assert.equal(Rules.evaluateActionObject(p.decisionState,actual).selected.classification,'BEST');
 });
 
+test('post-entry setup is a readable three-step possession before the wing decision',()=>{
+  const p=puzzle('POST_ENTRY','3',2);
+  assert.deepEqual(p.prelude.map(e=>e.type),['PASS','GROUP','MOVE']);
+  assert.ok(p.prelude.every(e=>e.duration>=600));
+  const group=p.prelude[1];
+  assert.equal(group.moves.length,3);
+  assert.ok(group.moves.some(m=>Array.isArray(m.path)&&m.path.includes('RIM')));
+  assert.equal(p.decisionState.ballHandler,p.decisionPlayer);
+  assert.equal(p.decisionState.offense.P5.location,'LEFT_BLOCK');
+});
+
+test('best post entry creates a new split-screen decision in the same possession',()=>{
+  const p=puzzle('POST_ENTRY','3',2);
+  const best=p.rankedSolutions[0].action;
+  assert.equal(best.type,'PASS');
+  assert.equal(best.targetPlayer,'P5');
+  const next=Rules.nextDecisionState(p.decisionState,best);
+  assert.ok(next);
+  assert.equal(next.state.ballHandler,'P5');
+  assert.equal(next.state.decisionPlayer,p.decisionPlayer);
+  assert.ok(next.state.context.splitScreen);
+  const ranked=Rules.rankActions(next.state);
+  assert.equal(ranked[0].action.type,'SCREEN');
+  assert.equal(ranked[0].action.targetPlayer,next.state.context.splitScreen.screenTarget);
+});
+
 test('invalid free-space movement remains a wrong action instead of becoming a hidden menu choice',()=>{
   const p=puzzle('CURL_READ','3',1);
   const action=Rules.inferGestureAction(p.decisionState,{type:'MOVE',targetLocation:'LEFT_DUNKER'},[]);
@@ -152,6 +179,9 @@ test('gesture UI uses long press menu instead of candidate action list',()=>{
   assert.match(js,/LONG_PRESS_MS/);
   assert.match(js,/handleCourtPointerUp/);
   assert.match(js,/nearestSpot/);
+  assert.match(js,/ACTION_MS=620/);
+  assert.match(js,/Rules\.nextDecisionState/);
+  assert.doesNotMatch(js,/showPath|eventPath|choicePath/);
 });
 
 test('runtime stores detailed attempts and schedules spaced repetition',()=>{

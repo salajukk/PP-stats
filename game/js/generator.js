@@ -32,6 +32,17 @@
       }
     }
 
+    if(event.type==="GROUP"){
+      (event.moves||[]).forEach(function(move){
+        var mover=next.offense[move.player];
+        if(!mover)return;
+        var movePath=move.path||[];
+        if(move.to)mover.location=move.to;
+        else if(movePath.length)mover.location=movePath[movePath.length-1];
+        if(next.ballHandler===move.player)next.ballLocation=mover.location;
+      });
+    }
+
     if(event.type==="SCREEN"&&event.moveTo&&next.offense[event.player]){
       next.offense[event.player].location=event.moveTo;
     }
