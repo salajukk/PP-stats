@@ -22,6 +22,7 @@
 <button class="tab" onclick="showTab('tbl',this)">📊 Tilastot</button>
 <button class="tab" onclick="showTab('playerHistory',this)">👤 Pelaajahistoria</button>
 <button class="tab" onclick="showTab('teamHistory',this)">📚 Joukkuehistoria</button>
+<a class="tab game-tab" href="game/">🎮 Päätöspeli</a>
 <select class="season-select" id="seasonSel" onchange="changeSeason()"></select>
 </nav>
 <section id="radar" class="section active"><h2>Pelaajaprofiilit</h2><p class="sdesc">Vertaile kahta pelaajaa seitsemällä osa-alueella.</p><div class="chip-label">Pelaaja 1</div><div class="chip-row" id="c1"></div><div class="chip-label">Pelaaja 2</div><div class="chip-row" id="c2"></div><div class="radar-wrap"><div class="cbox"><p id="radarNote" class="sdesc" style="display:none;margin-bottom:0"></p><canvas id="radarC"></canvas></div></div></section>

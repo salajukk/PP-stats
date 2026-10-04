@@ -25,6 +25,11 @@ jobs:
           for file in js/*.js; do
             node --check "$file"
           done
+          if [ -d game/js ]; then
+            for file in game/js/*.js; do
+              node --check "$file"
+            done
+          fi
 
       - name: Run logic tests
         run: node --test tests/*.test.cjs
