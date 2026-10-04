@@ -4,7 +4,7 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
   <meta name="theme-color" content="#0d0f14">
-  <title>Päätöspeli · PP Stats</title>
+  <title>Villanova Motion · PP Stats</title>
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Bebas+Neue&family=DM+Sans:wght@400;500;600;700&display=swap" rel="stylesheet">
@@ -14,19 +14,19 @@
   <main class="game-app">
     <section id="setupScreen" class="setup-screen">
       <header class="game-topbar">
-        <a class="back-link" href="../" aria-label="Takaisin PP Statsiin">← PP Stats</a>
-        <span class="mini-brand">PÄÄTÖSPELI</span>
+        <a class="back-link" href="../">← PP Stats</a>
+        <span class="mini-brand">MOTION PUZZLES</span>
       </header>
 
       <div class="setup-content">
-        <p class="kicker">4-OUT / 1-IN</p>
-        <h1>Read & React</h1>
-        <p class="lead">Katso triggeri ja napauta heti paikkaa, johon sinun pitää liikkua.</p>
+        <p class="kicker">VILLANOVA 4-OUT MOTION</p>
+        <h1>Read the Defense</h1>
+        <p class="lead">Tilanne rakentuu ensin. Kun peli pysähtyy, valitse ratkaisu puolustuksen perusteella — ei ulkoa opitun kuvion mukaan.</p>
 
         <section class="setup-card">
           <div class="setup-group">
             <div class="setup-label">Pelipaikka</div>
-            <div id="roleGrid" class="role-grid" role="group" aria-label="Valitse pelipaikka">
+            <div class="role-grid" role="group" aria-label="Pelipaikka">
               <button class="choice active" data-role="random">Kaikki</button>
               <button class="choice" data-role="1">PG</button>
               <button class="choice" data-role="2">SG</button>
@@ -37,32 +37,32 @@
           </div>
 
           <div class="setup-group">
-            <div class="setup-label">Pelimuoto</div>
-            <div id="modeGrid" class="mode-grid" role="group" aria-label="Valitse pelimuoto">
-              <button class="mode-choice active" data-mode="practice">
-                <strong>Practice</strong>
-                <span>Palaute joka tilanteesta</span>
-              </button>
-              <button class="mode-choice" data-mode="challenge">
-                <strong>Challenge</strong>
-                <span>20 nopeaa tilannetta</span>
-              </button>
+            <div class="setup-label">Vaikeus</div>
+            <div class="level-grid" role="group" aria-label="Vaikeustaso">
+              <button class="choice" data-level="1">Level 1</button>
+              <button class="choice active" data-level="2">Level 2</button>
+              <button class="choice" data-level="3">Level 3</button>
             </div>
           </div>
 
-          <button id="startBtn" class="primary-btn">Aloita peli</button>
-          <p class="thumb-tip">Pidä puhelin pystyasennossa. Pelaa yhdellä peukalolla.</p>
+          <div class="setup-group">
+            <div class="setup-label">Pelimuoto</div>
+            <div class="mode-grid">
+              <button class="mode-choice active" data-mode="practice"><strong>Practice</strong><span>Selitys + spaced repetition</span></button>
+              <button class="mode-choice" data-mode="challenge"><strong>Challenge</strong><span>20 tilannetta</span></button>
+            </div>
+          </div>
+
+          <button id="startBtn" class="primary-btn">Aloita</button>
+          <p class="thumb-tip">Puolustus = tummat D-pelaajat. Aktiivinen hyökkääjä = keltainen.</p>
         </section>
       </div>
     </section>
 
-    <section id="playScreen" class="play-screen hidden" aria-label="Pelikierros">
+    <section id="playScreen" class="play-screen hidden">
       <header class="play-topbar">
-        <button id="exitBtn" class="icon-btn" aria-label="Lopeta peli">×</button>
-        <div class="play-brand">
-          <span>PP STATS</span>
-          <strong id="roundLabel">Practice</strong>
-        </div>
+        <button id="exitBtn" class="icon-btn" aria-label="Lopeta">×</button>
+        <div class="play-brand"><span id="categoryLabel">PASS & CUT</span><strong id="roundLabel">Practice · 1</strong></div>
         <div class="role-badge" id="roleBadge">PG</div>
       </header>
 
@@ -73,34 +73,32 @@
       </div>
 
       <section class="trigger-panel" aria-live="polite">
-        <span id="triggerState" class="trigger-state">VALMISTAUDU</span>
-        <strong id="triggerText">Katso lähtöasetelma.</strong>
+        <div class="trigger-row"><span id="triggerState" class="trigger-state">TILANNE</span><span id="eventCounter" class="event-counter"></span></div>
+        <strong id="triggerText">Katso mitä tapahtuu.</strong>
+        <small id="decisionHint"></small>
       </section>
 
       <div class="court-shell">
         <div id="court" class="court" aria-label="Koripallokenttä">
-          <div class="paint"></div>
-          <div class="free-throw"></div>
-          <div class="three-arc"></div>
-          <div class="backboard"></div>
-          <div class="hoop"></div>
-
+          <div class="paint"></div><div class="free-throw"></div><div class="three-arc"></div><div class="backboard"></div><div class="hoop"></div>
           <svg class="movement-layer" viewBox="0 0 100 100" preserveAspectRatio="none" aria-hidden="true">
-            <defs>
-              <marker id="arrowHead" markerWidth="6" markerHeight="6" refX="5" refY="3" orient="auto">
-                <path d="M0,0 L6,3 L0,6 Z"></path>
-              </marker>
-            </defs>
+            <defs><marker id="arrowHead" markerWidth="6" markerHeight="6" refX="5" refY="3" orient="auto"><path d="M0,0 L6,3 L0,6 Z"></path></marker></defs>
             <line id="answerArrow" x1="0" y1="0" x2="0" y2="0"></line>
           </svg>
-
           <div id="spotsLayer"></div>
+          <div id="defenseLayer"></div>
           <div id="playersLayer"></div>
-          <div id="ball" class="ball" aria-label="Pallo"></div>
+          <div id="ball" class="ball"></div>
         </div>
       </div>
 
-      <div class="tap-prompt" id="tapPrompt">Katso ensin, sitten reagoi.</div>
+      <section id="decisionDock" class="decision-dock">
+        <div class="decision-dock-head">
+          <strong id="actionPrompt">Seuraa tapahtumia…</strong>
+          <span id="defensePrompt"></span>
+        </div>
+        <div id="actionChoices" class="action-choices"></div>
+      </section>
     </section>
 
     <section id="resultsScreen" class="results-screen hidden">
@@ -109,16 +107,14 @@
         <span class="mini-brand">CHALLENGE</span>
       </header>
       <div class="results-content">
-        <p class="kicker">20 TILANNETTA</p>
-        <h1>Tulos</h1>
-        <div class="result-score" id="resultScore">0</div>
+        <p class="kicker">20 TILANNETTA</p><h1>Tulos</h1><div class="result-score" id="resultScore">0</div>
         <div class="result-grid">
-          <div><span>Oikein</span><strong id="resultCorrect">0</strong></div>
-          <div><span>Väärin</span><strong id="resultWrong">0</strong></div>
-          <div><span>Accuracy</span><strong id="resultAccuracy">0%</strong></div>
+          <div><span>Best</span><strong id="resultBestReads">0</strong></div>
+          <div><span>Good</span><strong id="resultGood">0</strong></div>
+          <div><span>Acceptable</span><strong id="resultAcceptable">0</strong></div>
+          <div><span>Poor / wrong</span><strong id="resultMisses">0</strong></div>
           <div><span>Keski-aika</span><strong id="resultAvg">0.00 s</strong></div>
           <div><span>Paras streak</span><strong id="resultStreak">0</strong></div>
-          <div><span>Ennätys</span><strong id="resultBest">0</strong></div>
         </div>
         <button id="replayBtn" class="primary-btn">Pelaa uudelleen</button>
         <a class="secondary-btn" href="../">Takaisin PP Statsiin</a>
@@ -129,19 +125,20 @@
     <aside id="feedbackSheet" class="feedback-sheet hidden" aria-live="assertive">
       <div class="sheet-handle"></div>
       <div class="feedback-head">
-        <div>
-          <span id="feedbackEyebrow">OIKEIN</span>
-          <strong id="feedbackTitle">+100</strong>
-        </div>
+        <div><span id="feedbackEyebrow">BEST</span><strong id="feedbackTitle">+100</strong></div>
         <div id="feedbackTime" class="feedback-time">0.82 s</div>
       </div>
+      <p id="selectedActionText" class="selected-action"></p>
       <p id="feedbackText"></p>
+      <div id="bestReadBox" class="best-read-box"></div>
       <button id="nextBtn" class="primary-btn">Seuraava</button>
     </aside>
   </main>
 
   <script src="js/logic.js"></script>
-  <script src="js/scenarios.js"></script>
+  <script src="js/rules.js"></script>
+  <script src="js/templates.js"></script>
+  <script src="js/generator.js"></script>
   <script src="js/game.js"></script>
 </body>
 </html>
