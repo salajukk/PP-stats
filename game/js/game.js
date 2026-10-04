@@ -1,6 +1,7 @@
 (function(){
   "use strict";
 
+  var GAME_BUILD="2026.10.04.3";
   var Logic=window.GameLogic;
   var Rules=window.GameRules;
   var Generator=window.PuzzleGenerator;

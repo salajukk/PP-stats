@@ -149,6 +149,26 @@ test('P5 weak-side setup contains wing-to-slot followed by slot-to-slot reversal
   assert.equal(p.reactionQueue[0].rule,'P5_WEAK_SIDE_POSITION');
 });
 
+test('weak-side exchange decision state is after reversal, exchange setup and ball-screen setup',()=>{
+  const p=puzzle('WEAK_SIDE_EXCHANGE');
+  const passes=p.playbackEvents.filter(e=>e.type==='PASS');
+  assert.ok(passes.length>=2);
+  assert.equal(passes[0].toPlayer,passes[1].fromPlayer);
+
+  const played=p.playbackEvents.reduce((state,event)=>Generator.applyEvent(state,event),Generator.clone(p.initialState));
+  assert.equal(played.ballHandler,passes[1].toPlayer);
+  assert.equal(p.decisionState.ballHandler,passes[1].toPlayer);
+  assert.equal(p.decisionState.ballLocation,p.decisionState.offense[passes[1].toPlayer].location);
+
+  const ballSide=Rules.sideOf(p.decisionState.ballLocation);
+  const weakSide=Rules.opposite(ballSide);
+  const firstDecision=p.reactionQueue[0];
+  assert.equal(firstDecision.rule,'WEAK_SIDE_EXCHANGE');
+  assert.equal(p.decisionState.offense[firstDecision.player].location,weakSide+'_SLOT');
+
+  assert.equal(p.decisionState.offense.P5.screeningTarget,p.decisionState.ballHandler);
+});
+
 test('ball-screen setup first completes wing-slot, slot-slot reversal and slot-wing exchange',()=>{
   const p=puzzle('BALL_SCREEN');
   assert.equal(p.playbackEvents[0].type,'PASS');
@@ -211,6 +231,15 @@ test('templates contain triggers, not hard-coded correct-answer fields',()=>{
   assert.match(source,/SLOT_TO_WING_PASS/);
   assert.match(source,/BALL_SCREEN_START/);
   assert.match(source,/OFF_BALL_CUTTER_MOVE/);
+});
+
+test('preview assets are cache-busted and expose the current build',()=>{
+  const html=fs.readFileSync(path.join(ROOT,'game','index.html'),'utf8');
+  const game=fs.readFileSync(path.join(ROOT,'game','js','game.js'),'utf8');
+  assert.match(html,/styles\.css\?v=2026\.10\.04\.3/);
+  assert.match(html,/templates\.js\?v=2026\.10\.04\.3/);
+  assert.match(html,/game\.js\?v=2026\.10\.04\.3/);
+  assert.match(game,/GAME_BUILD="2026\.10\.04\.3/);
 });
 
 test('game interaction is direct court movement without action menu or defense UI',()=>{
