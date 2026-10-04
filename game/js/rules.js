@@ -8,6 +8,7 @@
   var PERIMETER=["LEFT_SLOT","RIGHT_SLOT","LEFT_WING","RIGHT_WING"];
   var RULE_LIBRARY=[
     "PASSER_MUST_MOVE",
+    "WING_TO_SLOT_BALL_REVERSAL",
     "SLOT_TO_WING_THRU_CUT",
     "EMPTY_SLOT_FILL",
     "PERIMETER_ROTATION",
@@ -73,6 +74,34 @@
     if(action.type==="SCREEN")return"SCREEN|"+action.player+"|"+action.targetPlayer;
     if(action.type==="CONFIRM")return"CONFIRM";
     return action.type+"|"+(action.player||"");
+  }
+
+  function getBallContinuation(state,event){
+    if(!state||!event||event.type!=="PASS")return null;
+    var fromPlayer=state.offense[event.fromPlayer];
+    var toPlayer=state.offense[event.toPlayer];
+    if(!fromPlayer||!toPlayer)return null;
+
+    var fromLocation=fromPlayer.location;
+    var toLocation=toPlayer.location;
+    var fromSide=sideOf(fromLocation);
+    var toSide=sideOf(toLocation);
+
+    var isWingToSameSideSlot=/_(WING)$/.test(fromLocation||"")&&/_(SLOT)$/.test(toLocation||"")&&fromSide===toSide;
+    if(!isWingToSameSideSlot)return null;
+
+    var oppositeSlot=slot(opposite(toSide));
+    var receiver=playerAt(state,oppositeSlot,event.toPlayer);
+    if(!receiver)return null;
+
+    return{
+      type:"PASS",
+      fromPlayer:event.toPlayer,
+      toPlayer:receiver,
+      rule:"WING_TO_SLOT_BALL_REVERSAL",
+      label:event.toPlayer+" reversaa pallon "+toLocation+" → "+oppositeSlot,
+      duration:1050
+    };
   }
 
   function getRequiredReactions(state,trigger){
@@ -365,6 +394,7 @@
     playerAt:playerAt,
     actionKey:actionKey,
     choiceAction:choiceAction,
+    getBallContinuation:getBallContinuation,
     getRequiredReactions:getRequiredReactions,
     applyReaction:applyReaction,
     reactionToEvent:reactionToEvent,

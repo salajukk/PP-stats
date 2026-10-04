@@ -17,9 +17,9 @@ function puzzle(category){
   return Generator.generatePuzzle({category,randomFn:seeded()});
 }
 
-test('rule library contains the 12 offensive movement rules',()=>{
+test('rule library contains offensive movement plus explicit wing-to-slot reversal',()=>{
   assert.deepEqual(Rules.RULE_LIBRARY,[
-    'PASSER_MUST_MOVE','SLOT_TO_WING_THRU_CUT','EMPTY_SLOT_FILL','PERIMETER_ROTATION',
+    'PASSER_MUST_MOVE','WING_TO_SLOT_BALL_REVERSAL','SLOT_TO_WING_THRU_CUT','EMPTY_SLOT_FILL','PERIMETER_ROTATION',
     'SLOT_TO_SLOT_EXCHANGE','P5_WEAK_SIDE_POSITION','P5_SLOT_TO_WING_RELOCATION',
     'P5_BALL_SCREEN_MOVEMENT','STRONG_SIDE_SHAKE','WEAK_SIDE_EXCHANGE',
     'SCREENER_SECOND_CUT','DRIVE_SPACING'
@@ -76,6 +76,18 @@ test('completed rotation asks for spacing confirmation after applying all reacti
   assert.equal(Rules.evaluateInput(p.reactionQueue[0],{type:'CONFIRM'},p.decisionState).correct,true);
 });
 
+test('wing-to-slot pass continues with slot-to-opposite-slot ball reversal, never immediate ball screen',()=>{
+  const s=Templates.sideData('LEFT');
+  const state=Templates.baseState(s.wingPlayer);
+  const event={type:'PASS',fromPlayer:s.wingPlayer,toPlayer:s.slotPlayer};
+  const next=Rules.getBallContinuation(state,event);
+  assert.ok(next);
+  assert.equal(next.rule,'WING_TO_SLOT_BALL_REVERSAL');
+  assert.equal(next.fromPlayer,s.slotPlayer);
+  assert.equal(state.offense[next.toPlayer].location,s.oppositeSlot);
+  assert.notEqual(next.type,'SCREEN');
+});
+
 test('slot-to-slot pass creates screen, wing fill and legal exchange-or-slip choice',()=>{
   const p=puzzle('SLOT_EXCHANGE');
   assert.equal(p.allReactions.length,3);
@@ -126,12 +138,26 @@ test('exchange choice does not invoke a random follow-up event',()=>{
   assert.equal(outcome.reactions.length,0);
 });
 
-test('P5 weak-side standalone stage uses a direct ball-to-slot trigger',()=>{
+test('P5 weak-side setup contains wing-to-slot followed by slot-to-slot reversal',()=>{
   const p=puzzle('P5_WEAK_SIDE');
   assert.equal(p.reactionQueue.length,1);
   assert.equal(p.trigger.type,'BALL_TO_SLOT');
+  assert.equal(p.playbackEvents[0].type,'PASS');
+  assert.equal(p.playbackEvents[1].type,'PASS');
+  assert.equal(p.playbackEvents[0].toPlayer,p.playbackEvents[1].fromPlayer);
   assert.equal(p.reactionQueue[0].player,'P5');
   assert.equal(p.reactionQueue[0].rule,'P5_WEAK_SIDE_POSITION');
+});
+
+test('ball-screen setup first completes wing-slot, slot-slot reversal and slot-wing exchange',()=>{
+  const p=puzzle('BALL_SCREEN');
+  assert.equal(p.playbackEvents[0].type,'PASS');
+  assert.equal(p.playbackEvents[1].type,'PASS');
+  assert.equal(p.playbackEvents[2].type,'SCREEN');
+  assert.equal(p.playbackEvents[3].movement,'FILL');
+  assert.equal(p.playbackEvents[4].movement,'EXCHANGE');
+  assert.equal(p.playbackEvents[5].player,'P5');
+  assert.equal(p.playbackEvents[5].movement,'RELOCATE');
 });
 
 test('ball-screen trigger creates screen, shake, weak-side exchange pair and roll',()=>{
@@ -195,6 +221,15 @@ test('game interaction is direct court movement without action menu or defense U
   assert.match(game,/submitInput\(\{type:"SCREEN"/);
   assert.match(game,/Generator\.resolveChoiceOutcome/);
   assert.match(html,/confirmSpacingBtn/);
+});
+
+test('ball-screen family has lower random weight than the core motion families',()=>{
+  const defs=Templates.DEFINITIONS;
+  const bs=defs.filter(d=>['BALL_SCREEN','SHAKE','WEAK_SIDE_EXCHANGE','ROLL'].includes(d.category))
+    .reduce((sum,d)=>sum+d.weight,0);
+  const core=defs.filter(d=>['THRU_CUT','SLOT_EXCHANGE'].includes(d.category))
+    .reduce((sum,d)=>sum+d.weight,0);
+  assert.ok(bs<core);
 });
 
 test('animation pacing is deliberately slow and staged',()=>{

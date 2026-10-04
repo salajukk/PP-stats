@@ -116,8 +116,10 @@
       category:"P5_WEAK_SIDE",
       initialState:state,
       prelude:[
-        event("PASS",{fromPlayer:s.wingPlayer,toPlayer:s.oppositeSlotPlayer},
-          s.wingPlayer+" syöttää pallon vastakkaiseen slottiin")
+        event("PASS",{fromPlayer:s.wingPlayer,toPlayer:s.slotPlayer},
+          s.wingPlayer+" syöttää wingiltä "+s.slot+"iin"),
+        event("PASS",{fromPlayer:s.slotPlayer,toPlayer:s.oppositeSlotPlayer},
+          s.slotPlayer+" reversaa pallon "+s.slot+" → "+s.oppositeSlot)
       ],
       trigger:{
         type:"BALL_TO_SLOT",
@@ -131,18 +133,28 @@
     var side=choose(random,["LEFT","RIGHT"]);
     var s=sideData(side);
     var state=baseState(s.wingPlayer);
-    state.offense.P5.location=s.oppositeDunker;
+
     return{
       category:category,
       initialState:state,
       prelude:[
         event("PASS",{fromPlayer:s.wingPlayer,toPlayer:s.slotPlayer},
           s.wingPlayer+" syöttää wingiltä "+s.slot+"iin"),
-        event("WAIT",{},"Pallo on slotissa — P5 valmistautuu palloskriiniin",850)
+        event("PASS",{fromPlayer:s.slotPlayer,toPlayer:s.oppositeSlotPlayer},
+          s.slotPlayer+" reversaa pallon "+s.slot+" → "+s.oppositeSlot),
+        event("SCREEN",{player:s.slotPlayer,targetPlayer:s.wingPlayer,targetLocation:s.wing},
+          s.slotPlayer+" screenaa saman puolen wingin"),
+        event("MOVE",{player:s.wingPlayer,to:s.slot,movement:"FILL"},
+          s.wingPlayer+" fillaa vapautuneen "+s.slot+"in"),
+        event("MOVE",{player:s.slotPlayer,to:s.wing,movement:"EXCHANGE"},
+          s.slotPlayer+" jatkaa exchangeen ja täyttää "+s.wing+"in"),
+        event("MOVE",{player:"P5",to:s.dunker,movement:"RELOCATE"},
+          "P5 siirtyy uuden pallopuolen weak-side dunkeriin"),
+        event("WAIT",{},"Ball reversal + exchange valmis — nyt P5 voi tulla palloskriiniin",900)
       ],
       trigger:{
         type:"BALL_SCREEN_START",
-        ballHandler:s.slotPlayer,
+        ballHandler:s.oppositeSlotPlayer,
         screener:"P5"
       },
       startReaction:startReaction
@@ -226,10 +238,10 @@
     {category:"EXCHANGE_PARTNER",weight:2,build:function(r){return slotExchangeTemplate(r,"EXCHANGE_PARTNER",1);}},
     {category:"P5_WEAK_SIDE",weight:2,build:p5WeakSideTemplate},
     {category:"P5_WING_REACTION",weight:3,build:function(r){return slotWingTemplate(r,"P5_WING_REACTION",3,false);}},
-    {category:"BALL_SCREEN",weight:4,build:function(r){return ballScreenTemplate(r,"BALL_SCREEN",0);}},
-    {category:"SHAKE",weight:3,build:function(r){return ballScreenTemplate(r,"SHAKE",1);}},
-    {category:"WEAK_SIDE_EXCHANGE",weight:3,build:function(r){return ballScreenTemplate(r,"WEAK_SIDE_EXCHANGE",2);}},
-    {category:"ROLL",weight:2,build:function(r){return ballScreenTemplate(r,"ROLL",4);}},
+    {category:"BALL_SCREEN",weight:2,build:function(r){return ballScreenTemplate(r,"BALL_SCREEN",0);}},
+    {category:"SHAKE",weight:1,build:function(r){return ballScreenTemplate(r,"SHAKE",1);}},
+    {category:"WEAK_SIDE_EXCHANGE",weight:1,build:function(r){return ballScreenTemplate(r,"WEAK_SIDE_EXCHANGE",2);}},
+    {category:"ROLL",weight:1,build:function(r){return ballScreenTemplate(r,"ROLL",4);}},
     {category:"CUTTER_CURL",weight:2,build:buildCutterCurl},
     {category:"CUTTER_POP",weight:2,build:buildCutterPop},
     {category:"BASELINE_DRIVE",weight:2,build:buildBaselineDrive}

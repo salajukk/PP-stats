@@ -28,6 +28,8 @@
         var path=event.path||[];
         if(event.to)player.location=event.to;
         else if(path.length)player.location=path[path.length-1];
+        delete player.screeningTarget;
+        delete player.screeningLocation;
         if(next.ballHandler===event.player)next.ballLocation=player.location;
       }
     }
