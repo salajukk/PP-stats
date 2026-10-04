@@ -380,6 +380,76 @@
     return best?"LOWER_VALUE_READ":"UNKNOWN";
   }
 
+
+  function actionMatches(actual,expected){
+    if(!actual||!expected||actual.type!==expected.type)return false;
+    if(actual.player&&expected.player&&actual.player!==expected.player)return false;
+    if(actual.type==="PASS"||actual.type==="SCREEN")return actual.targetPlayer===expected.targetPlayer;
+    if(actual.type==="CUT"||actual.type==="FILL")return actual.targetLocation===expected.targetLocation;
+    if(actual.type==="DRIVE")return !actual.driveType||!expected.driveType||actual.driveType===expected.driveType;
+    if(actual.type==="SHOOT"||actual.type==="HOLD")return true;
+    if(actual.type==="SEQUENCE"){
+      if(!actual.steps||!expected.steps||actual.steps.length!==expected.steps.length)return false;
+      return actual.steps.every(function(step,index){return actionMatches(step,expected.steps[index]);});
+    }
+    return actionKey(actual)===actionKey(expected);
+  }
+
+  function sequencePrefixMatches(sequenceAction,prefix){
+    if(!sequenceAction||sequenceAction.type!=="SEQUENCE"||!sequenceAction.steps)return false;
+    if(!prefix||prefix.length>sequenceAction.steps.length)return false;
+    return prefix.every(function(step,index){return actionMatches(step,sequenceAction.steps[index]);});
+  }
+
+  function inferGestureAction(state,intent,prefix){
+    prefix=prefix||[];
+    var valid=getValidActions(state);
+    var expectedNext=[];
+    valid.forEach(function(action){
+      if(action.type==="SEQUENCE"&&sequencePrefixMatches(action,prefix)&&action.steps[prefix.length]){
+        expectedNext.push(action.steps[prefix.length]);
+      }
+    });
+    var direct=valid.filter(function(action){return action.type!=="SEQUENCE";});
+    var pool=expectedNext.concat(direct);
+    var player=state.decisionPlayer;
+
+    function firstMatch(predicate){
+      for(var i=0;i<pool.length;i++)if(predicate(pool[i]))return clone(pool[i]);
+      return null;
+    }
+
+    if(intent.type==="PASS"){
+      return firstMatch(function(action){return action.type==="PASS"&&action.targetPlayer===intent.targetPlayer;})||
+        makeAction("PASS",player,{targetPlayer:intent.targetPlayer});
+    }
+    if(intent.type==="SCREEN"){
+      return firstMatch(function(action){return action.type==="SCREEN"&&action.targetPlayer===intent.targetPlayer;})||
+        makeAction("SCREEN",player,{targetPlayer:intent.targetPlayer,screenType:"OFF_BALL"});
+    }
+    if(intent.type==="MOVE"){
+      return firstMatch(function(action){
+        return(action.type==="CUT"||action.type==="FILL")&&action.targetLocation===intent.targetLocation;
+      })||makeAction("CUT",player,{cutType:"MOVE",targetLocation:intent.targetLocation,path:[intent.targetLocation]});
+    }
+    if(intent.type==="DRIVE"){
+      return firstMatch(function(action){return action.type==="DRIVE";})||makeAction("DRIVE",player,{driveType:"ADVANTAGE"});
+    }
+    if(intent.type==="SHOOT"){
+      return firstMatch(function(action){return action.type==="SHOOT";})||makeAction("SHOOT",player);
+    }
+    return makeAction("HOLD",player);
+  }
+
+  function evaluateActionObject(state,actual){
+    var ranked=rankActions(state);
+    var selected=ranked.find(function(item){return actionMatches(actual,item.action);});
+    if(selected)return{selected:{action:actual,score:selected.score,classification:selected.classification},best:ranked[0]||null,ranked:ranked};
+    return{selected:{action:actual,score:-100,classification:"WRONG"},best:ranked[0]||null,ranked:ranked};
+  }
+
+  function clone(value){return JSON.parse(JSON.stringify(value));}
+
   return{
     PERIMETER:PERIMETER.slice(),
     makeAction:makeAction,
@@ -392,6 +462,10 @@
     describeAction:describeAction,
     explainAction:explainAction,
     mistakeType:mistakeType,
+    actionMatches:actionMatches,
+    sequencePrefixMatches:sequencePrefixMatches,
+    inferGestureAction:inferGestureAction,
+    evaluateActionObject:evaluateActionObject,
     clone:clone,
     getDefender:getDefender
   };

@@ -105,7 +105,9 @@ test('game page loads rule engine, templates and generator before UI',()=>{
   const game=html.indexOf('js/game.js');
   assert.ok(rules>0&&rules<templates&&templates<generator&&generator<game);
   assert.match(html,/id="defenseLayer"/);
-  assert.match(html,/id="actionChoices"/);
+  assert.match(html,/id="intentMenu"/);
+  assert.match(html,/id="eventPath"/);
+  assert.match(html,/id="choicePath"/);
 });
 
 test('mobile UI keeps touch targets and defender styling',()=>{
@@ -114,6 +116,42 @@ test('mobile UI keeps touch targets and defender styling',()=>{
   assert.match(css,/min-height:44px/);
   assert.match(css,/\.defender/);
   assert.match(css,/safe-area-inset-bottom/);
+});
+
+test('gesture inference maps movement to tactical actions and supports sequence prefixes',()=>{
+  const p=puzzle('POST_SPLIT_SEQUENCE','3',3);
+  const first=Rules.inferGestureAction(p.decisionState,{type:'PASS',targetPlayer:'P5'},[]);
+  assert.equal(first.type,'PASS');
+  const seq=p.rankedSolutions.find(x=>x.action.type==='SEQUENCE').action;
+  assert.ok(Rules.sequencePrefixMatches(seq,[first]));
+
+  const second=Rules.inferGestureAction(p.decisionState,{type:'SCREEN',targetPlayer:seq.steps[1].targetPlayer},[first]);
+  assert.equal(second.type,'SCREEN');
+  assert.ok(Rules.sequencePrefixMatches(seq,[first,second]));
+
+  const third=Rules.inferGestureAction(p.decisionState,{type:'MOVE',targetLocation:seq.steps[2].targetLocation},[first,second]);
+  assert.equal(third.type,'CUT');
+  assert.ok(Rules.actionMatches(third,seq.steps[2]));
+
+  const actual=Rules.makeAction('SEQUENCE',p.decisionPlayer,{sequenceId:'USER_GESTURE',steps:[first,second,third]});
+  assert.equal(Rules.evaluateActionObject(p.decisionState,actual).selected.classification,'BEST');
+});
+
+test('invalid free-space movement remains a wrong action instead of becoming a hidden menu choice',()=>{
+  const p=puzzle('CURL_READ','3',1);
+  const action=Rules.inferGestureAction(p.decisionState,{type:'MOVE',targetLocation:'LEFT_DUNKER'},[]);
+  assert.equal(Rules.evaluateActionObject(p.decisionState,action).selected.classification,'WRONG');
+});
+
+test('gesture UI uses long press menu instead of candidate action list',()=>{
+  const html=fs.readFileSync(path.join(ROOT,'game','index.html'),'utf8');
+  const js=fs.readFileSync(path.join(ROOT,'game','js','game.js'),'utf8');
+  assert.match(html,/data-intent="PASS"/);
+  assert.match(html,/data-intent="MOVE"/);
+  assert.doesNotMatch(html,/id="actionChoices"/);
+  assert.match(js,/LONG_PRESS_MS/);
+  assert.match(js,/handleCourtPointerUp/);
+  assert.match(js,/nearestSpot/);
 });
 
 test('runtime stores detailed attempts and schedules spaced repetition',()=>{
